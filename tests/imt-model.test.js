@@ -1,0 +1,37 @@
+const assert=require('node:assert/strict');
+const {quote,defs}=require('../imt-cost-model');
+const scenario={km:53.4,travelHours:1,year:2022,dieselPrice:26.99,utility:.08,rows:[{id:'urbano',km:20},{id:'autopista_sin',km:33.4}],elevationAvailable:true,ascent:140,descent:60};
+for(const [type,preset] of Object.entries(defs)){
+ const r=quote({...scenario,type,loadTons:preset.cap});
+ assert(r.tariff>r.cost && r.fixedAllocation>0 && r.variableTotal>0,`positive ${type}`);
+ assert(Math.abs(r.tariff-r.cost*1.08)<1e-7,`8pct ${type}`);
+ assert.equal(r.kmTotal,106.8);
+ assert(r.loadedLitres>0&&r.emptyLitres>0&&r.dieselLitres>r.loadedLitres);
+ assert.equal(Math.round(r.classifiedKm*10)/10,53.4);
+}
+const base={...scenario,type:'Rabón',loadTons:9};
+const normal=quote(base),hill=quote({...base,ascent:1100}),old=quote({...base,year:2003}),moreKm=quote({...base,km:70,rows:[{id:'urbano',km:20},{id:'autopista_sin',km:50}]}),tolls=quote({...base,tollsOneWay:500}),twoMorePoints=quote({...base,utility:.1}),modified=quote({...base,rows:[{id:'urbano',km:20},{id:'autopista_con',km:33.4}]}),fixed=quote({...base,operatorMode:'fijo',operatorPerKm:4}),variable=quote({...base,operatorMode:'variable',operatorPerKm:4});
+assert(hill.tariff>normal.tariff,'grade reacts');
+assert(old.tariff>normal.tariff,'model year reacts');
+assert(moreKm.tariff>normal.tariff,'distance reacts');
+assert(tolls.variable.tolls===1000,'tolls doubled');
+assert(twoMorePoints.tariff>normal.tariff,'utility reacts');
+assert(modified.tariff>normal.tariff,'georisk classes react');
+assert(fixed.monthly.operator>0&&variable.monthly.operator===0,'operator wages not double counted');
+assert(variable.variable.serviceMisc>fixed.variable.serviceMisc,'variable operator compensation correctly used');
+assert.throws(()=>quote({...base,rows:[{id:'urbano',km:54}]}),/superan/);
+assert.throws(()=>quote({...base,loadTons:18}),/fuera de capacidad/);
+console.log('PASS: five types, utility, 2 legs, elevation, wear, time/year, tolls, operator compensation, validations.');
+const carrierQ=quote({...base,carrierAdminFactor:.7,carrierPatioFactor:.65,carrierUtilizationFactor:.88}),largeQ=quote({...base,carrierAdminFactor:1.28,carrierPatioFactor:1.35,carrierUtilizationFactor:1.08});
+assert(carrierQ.monthly.admin<largeQ.monthly.admin,'small carrier has less administrative cost per truck');
+assert(carrierQ.monthly.patio<largeQ.monthly.patio,'small carrier has less infrastructure per truck');
+assert.equal(normal.refTiers[0].amount,normal.tariff,'C is 8% utility base');
+assert(normal.refTiers.every((t,i,all)=>i===0||t.amount>=all[i-1].amount),'proposed bands monotonic');
+assert(Math.abs(normal.refTiers.at(-1).amount-normal.tariff*1.20)<1e-8,'B SPOT is 20% over C');
+const overridden=quote({...base,tierPremiums:{CP:6,B:12,BP:18,SPOT:23}});
+assert(Math.abs(overridden.refTiers.at(-1).amount-overridden.tariff*1.23)<1e-8,'editable bands');
+console.log('PASS: fleet overhead/utilization and C/C Prima/B/B+/B SPOT reference tiers.');
+const year2008=quote({...base,year:2008}),year2018=quote({...base,year:2018}),year2026=quote({...base,year:2026});
+assert(year2008.tariff>year2018.tariff&&year2018.tariff>year2026.tariff,'2026-2000 modeled continuous age sensitivity');
+assert.equal(quote({...base,cargoType:'sacos'}).cargoType,'sacos');
+console.log('PASS: year 2000–2026 graduated assumptions, sacks scenario.');

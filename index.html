@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GeoCost SC | Cotizador de transporte</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="app-header">
+  <div class="brand-block">
+    <img class="cemex-logo-full" src="assets/logo-cemex.svg" alt="CEMEX">
+    <div class="brand-copy">
+      <div class="brand-name">CEMEX</div>
+      <div class="brand-sub">Autotransporte · Relieve y operación</div>
+    </div>
+  </div>
+  <div class="product-block">
+    <div class="product-name">GeoCost <span>SC</span></div>
+    <div class="product-sub">Centro Sur</div>
+  </div>
+  <nav class="header-actions">
+    <button class="header-btn" id="topClients">Clientes</button>
+    <button class="header-btn" id="topBodegas">Bodegas</button>
+    <button class="header-btn" id="topServicios" type="button" aria-expanded="false" aria-controls="servicePanel">Servicios</button>
+    <button class="header-btn" id="topReports">Reportes</button>
+    <button class="header-btn gc-exit" id="topExit" type="button" aria-label="Salir y volver a portada">↪ Salir</button>
+  </nav>
+</header>
+
+<section id="welcome" class="welcome-screen">
+  <div class="welcome-bg"></div>
+  <div class="welcome-overlay"></div>
+  <div class="welcome-card">
+    <div class="eyebrow">CEMEX · AUTOTRANSPORTE · CENTRO SUR</div>
+    <h1>GeoCost <span>SC</span></h1>
+    <h2>Centro Sur</h2>
+    <h3>Cotizador logístico por frente</h3>
+    <p>Planea, compara y cotiza rutas por frente con un enfoque operativo: origen, unidad, demanda, esfuerzo logístico y desglose integral de costos.</p>
+    <button id="startApp" class="start-btn">Iniciar <span aria-hidden="true">→</span></button>
+  </div>
+  <div class="welcome-feature-strip" aria-label="Funciones de GeoCost SC">
+    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4L10 8L15 3L20 7V20L15 16L10 21L4 17Z"/><path d="M10 8V21M15 3V16"/></svg><b>Rutas y<br>conexiones</b></span>
+    <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="13" width="4" height="8"/><rect x="10" y="8" width="4" height="13"/><rect x="17" y="3" width="4" height="18"/></svg><b>Costos<br>por frente</b></span>
+    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V5A2 2 0 0 1 7 3H13A2 2 0 0 1 15 5V21"/><path d="M15 8H18L21 11V18A2 2 0 0 1 17 18V15"/><rect x="7" y="6" width="6" height="5"/></svg><b>Gasolineras<br>y servicios</b></span>
+    <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="12" cy="20" r="2"/><path d="M6 10L10 6M14 6L18 10M18 14L14 18M10 18L6 14"/></svg><b>Demanda<br>y ZT</b></span>
+    <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M7 16L11 12L14 14L18 9"/></svg><b>Comparativos<br>y simulación</b></span>
+  </div>
+  <div class="welcome-credit">Desarrollo: Emilio Ortega / Maximiliano Flores</div>
+</section>
+
+<div id="app" class="app-shell app-hidden">
+  <aside class="left-column">
+    <section class="panel card-panel" id="p-ruta">
+      <h3>1. Origen y destino</h3>
+      <div class="body">
+        <label>Origen</label>
+        <div class="input-row"><input id="origen" list="bodegaList" autocomplete="off" placeholder="Bodega CEMEX o dirección de origen" aria-label="Bodega de origen"><button type="button" class="geocode-button" data-geocode="origen">Buscar dirección de origen</button><div class="geo-results" id="geoOrigenResults"></div></div>
+        <datalist id="bodegaList"></datalist><div id="origenSuggestions" class="search-results" hidden></div>
+
+        <label id="destinationLabel">Destino · frente / cliente</label>
+        <input id="destino" list="frenteList" autocomplete="off" placeholder="Cliente, bodega CEMEX o dirección de destino" aria-label="Frente de destino"><button type="button" class="geocode-button" data-geocode="destino">Buscar dirección de destino</button><div class="geo-results" id="geoDestinoResults"></div>
+        <datalist id="frenteList"></datalist><div id="destinoSuggestions" class="search-results" hidden></div>
+        <p class="hint" id="frontCount"></p>
+<div id="ztSapCard" class="zt-sap-box zt-sap-compact"><div class="zt-sap-head"><strong>ZT SAP · destino</strong><details class="zt-sap-details"><summary aria-label="Opciones de zona de transporte">Opciones</summary><div class="zt-sap-actions"><button type="button" id="ztSapCheck" class="secondary">Consultar ZT</button><button type="button" id="ztSapToggle" class="secondary">Ver en mapa</button></div><small>Cruce espacial SAP; tarifa no asignada automáticamente.</small></details></div><div id="ztSapResult" class="hint">Selecciona un destino para identificar su ZT.</div></div>
+
+        <div class="subgroup">
+          <div class="subhead">Cotizar desde otro origen (alterno)</div>
+          <div id="alternatives" class="alt-origins hint">Selecciona el frente para consultar bodegas cercanas.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Conexión interna: se conserva el valor predeterminado para la lógica de costos. -->
+    <select id="conexion" hidden aria-label="Tipo de conexión operativo"><option selected>Entrega</option><option>Recolección</option><option>Redondo</option><option>Multi-destino</option></select>
+
+    <section class="panel card-panel" id="p-transportista">
+      <h3>2. Tipo de transportista</h3>
+      <div class="body">
+        <label for="tipoTransportista">Tamaño de operación</label>
+        <select id="tipoTransportista" aria-label="Tamaño del transportista"><option value="chico">Chico</option><option value="mediano" selected>Mediano</option><option value="grande">Grande</option></select>
+        <p class="hint" id="fleetSizeInfo">Chico: 1–5 unidades · Mediano: 6–15 · Grande: 16+. Costos de personal, patio y utilización ajustables; sin tarifas oficiales supuestas.</p>
+      </div>
+    </section>
+
+    <section class="panel card-panel" id="p-unidad">
+      <h3>3. Unidad</h3>
+      <div class="body">
+        <div class="unit-grid" id="unitGrid">
+          <button class="unit-btn" data-unit="Camioneta"><svg class="vehicle-svg" viewBox="0 0 80 52" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><rect x="5" y="21" width="43" height="18" rx="2"/><path d="M48 26h13l8 8v5H48z"/></g><g fill="#ffffff" stroke="currentColor" stroke-width="4"><circle cx="18" cy="41" r="5"/><circle cx="50" cy="41" r="5"/><circle cx="64" cy="41" r="5"/></g></svg><span>Camioneta</span></button>
+          <button class="unit-btn active" data-unit="Rabón"><svg class="vehicle-svg" viewBox="0 0 80 52" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><rect x="3" y="20" width="47" height="19" rx="2"/><path d="M50 24h11l9 9v6H50z"/><path d="M34 20v19" stroke="#fff" stroke-opacity=".3"/></g><g fill="#ffffff" stroke="currentColor" stroke-width="4"><circle cx="18" cy="41" r="5"/><circle cx="50" cy="41" r="5"/><circle cx="64" cy="41" r="5"/></g></svg><span>Rabón</span></button>
+          <button class="unit-btn" data-unit="Torton"><svg class="vehicle-svg" viewBox="0 0 80 52" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><rect x="3" y="17" width="47" height="22" rx="2"/><path d="M50 22h12l8 11v6H50z"/><path d="M17 17v22M34 17v22" stroke="#fff" stroke-opacity=".3"/></g><g fill="#ffffff" stroke="currentColor" stroke-width="4"><circle cx="18" cy="41" r="5"/><circle cx="50" cy="41" r="5"/><circle cx="64" cy="41" r="5"/></g></svg><span>Torton</span></button>
+          <button class="unit-btn" data-unit="Tráiler"><svg class="vehicle-svg" viewBox="0 0 80 52" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><rect x="1" y="16" width="52" height="23" rx="2"/><path d="M54 23h10l8 10v6H54z"/><path d="M8 16v23" stroke="#fff" stroke-opacity=".3"/></g><g fill="#ffffff" stroke="currentColor" stroke-width="4"><circle cx="18" cy="41" r="5"/><circle cx="50" cy="41" r="5"/><circle cx="64" cy="41" r="5"/></g></svg><span>Tráiler</span></button>
+          <button class="unit-btn" data-unit="Full"><svg class="vehicle-svg" viewBox="0 0 80 52" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><rect x="1" y="18" width="31" height="20" rx="2"/><rect x="35" y="18" width="22" height="20" rx="2"/><path d="M58 24h8l7 9v5H58z"/></g><g fill="#ffffff" stroke="currentColor" stroke-width="4"><circle cx="18" cy="41" r="5"/><circle cx="50" cy="41" r="5"/><circle cx="64" cy="41" r="5"/></g></svg><span>Full</span></button>
+        </div>
+        <div class="present-wrap">
+          <button id="sacos" class="present-btn selected">Sacos</button>
+          <button id="granel" class="present-btn">Granel</button>
+        </div>
+        <select id="vehiculo" class="visually-hidden"></select>
+        <div id="maxInfo" class="hint good"></div>
+        <div id="unitError" class="error"></div>
+      </div>
+    </section>
+
+    <section class="panel card-panel" id="p-demanda-visual">
+      <h3>4. Demanda / carga</h3>
+      <div class="body two-col">
+        <div>
+          <label for="ton">Lote por viaje (Tn)</label>
+          <input type="number" id="ton" value="9" min="0.1" step="0.5">
+        </div>
+        <div>
+          <label for="numeroViajes">Número de viajes</label>
+          <input type="number" id="numeroViajes" value="1" min="1" step="1" inputmode="numeric">
+        </div>
+        <div class="fullwidth movement-total">
+          <label for="movidas">Movidas totales (Tn) = viajes × lote</label>
+          <input type="number" id="movidas" value="18" min="0" step="0.01" readonly aria-live="polite">
+        </div>
+        <label class="checkline fullwidth"><input type="checkbox" id="cargaCompleta" checked> Carga completa</label>
+        <div class="fullwidth cost-settings-entry"><button type="button" id="openCostSettings" aria-expanded="false">Configurar costos</button></div>
+        <div class="button-bar fullwidth final-actions">
+          <button class="primary widebtn" id="draw">Calcular ruta y cotizar</button>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="panel card-panel parameter-panel" id="cost-settings-panel" hidden aria-label="Parámetros de cotización">
+      <h3>Parámetros de cotización <button type="button" class="parameter-close" id="closeCostSettings" aria-label="Cerrar parámetros">×</button></h3>
+      <div class="body">
+        <div class="gc-clean-settings" id="gcCleanSettings">
+          <div class="gc-setting-intro"><strong>Modelo IMT–GeoRisk · ciclo completo</strong><small>Ida cargada + regreso vacío · MXN sin IVA. Utilidad inicial 8% editable. Los coeficientes no representan tarifas oficiales ni datos medidos de una flota.</small></div>
+          <section class="gc-setting-section"><h4>1 · Datos principales</h4><div class="gc-setting-grid" id="gcMainFields"></div></section>
+          <details class="gc-setting-section" id="gcDieselDetails"><summary>2 · Diésel estatal aplicado <span class="gc-pill" id="gcDieselShort">MXN/L</span></summary><div id="gcFuelPlace"></div></details>
+          <details class="gc-setting-section"><summary>3 · Peajes y casetas de ida y regreso</summary><div id="gcTollsPlace"></div></details>
+          <section class="gc-setting-section"><h4>4 · Tipo de transportista</h4><p class="gc-setting-hint">Costo administrativo y de infraestructura <b>por unidad</b>, no por empresa completa. Tamaños operativos propuestos: chico 1–5, mediano 6–15, grande 16+ unidades.</p>
+            <div class="gc-profile-summary" id="gcCarrierCurrent"></div>
+            <details class="gc-nested"><summary>Editar supuestos de flota por tamaño</summary><div class="gc-carrier-profiles" id="gcFleetFields"></div></details>
+          </section>
+          <div id="gcIMTPlace"></div>
+          <details class="gc-setting-section" id="gcManualCostsBox"><summary>6 · Ajustar rubros del costo de ESTA ruta (opcional)</summary><p class="gc-setting-hint">Cada concepto se calcula automáticamente con IMT–GeoRisk. Un importe en MXN sustituye solo ese rubro; vacío = automático y 0 = sin costo. Los ajustes se guardan por origen, destino y alternativa <b>en este navegador</b>, no se comparten con otras rutas ni equipos.</p><div id="gcManualCostFields" class="gc-setting-grid"></div><button type="button" class="secondary" id="gcManualReset">Limpiar ajustes y usar cálculos automáticos</button></details>
+          <section class="gc-setting-section"><h4>7 · Referencias comerciales propuestas</h4><p class="gc-setting-hint">C = tarifa IMT con utilidad 8%. Los niveles superiores son escenarios internos sobre C; <b>no</b> equivalen a escalas contractuales CEMEX sin su base de tarifas.</p><div id="gcTierFields"></div></section>
+          <details class="gc-setting-section"><summary>8 · Comparar con ofertas reales del mercado</summary><p class="gc-setting-hint">Captura propuestas recibidas para <b>la misma ruta de ida y vuelta, unidad, carga, casetas y condiciones</b>. Sin ofertas documentadas no se calcula un precio “de mercado” ficticio.</p><div class="gc-setting-grid" id="gcMarketFields"><label>Oferta comparable mínima (MXN)<input id="gcMarketMin" type="number" min="0" step="1" placeholder="Sin dato"></label><label>Oferta comparable máxima (MXN)<input id="gcMarketMax" type="number" min="0" step="1" placeholder="Sin dato"></label><label class="gc-wide">Referencia, proveedor y fecha<input id="gcMarketSource" type="text" placeholder="Transportista / fecha / misma ruta"></label></div></details>
+          <div class="gc-audit-control"><strong>Memoria de cálculo · uso interno</strong><p>Genera un reporte técnico separado, con todas las ecuaciones y componentes. No forma parte del informe comercial.</p><button id="gcOpenAudit" type="button" class="secondary">Generar memoria técnica</button><small>Acceso visual solamente: para restringirla a usuarios autorizados se requiere autenticación.</small></div><p class="gc-setting-hint"><b>Fuentes:</b> IMT Publicación Técnica 630 (estructura tarifaria); IMT 881 (condición superficial y geometría); ATRI 2026 (tendencias EE. UU., solo contexto). Coeficientes de rendimiento, año y desgaste sujetos a calibración con bitácoras reales. Consultar GUIA_COTIZADOR_REFERENCIAS_C_2026.md.</p>
+        </div>
+        <div id="gcLegacyControls" hidden aria-hidden="true">        <p class="hint">Valores de simulación editables en MXN. No representan tarifas oficiales.</p>
+        <div class="cost-settings-grid"><label for="diesel">Precio diésel base (MXN/L)</label><input type="number" id="diesel" value="26.99" min="1" step="0.01">
+<div class="fullwidth dynamic-costs diesel-panel"><strong>Diésel por estados atravesados · GasMapa / CRE-CNE</strong>
+<p class="hint">Promedio por estado ponderado según kilómetros de la ruta dentro de las zonas SAP. Precios de referencia, no cotizaciones en bomba.</p>
+<div class="fuel-primary"><span>Precio aplicado a la cotización</span><strong id="fuelCurrentPrice">Pendiente</strong></div>
+<div id="cneXmlSummary" class="hint">Cargando promedios estatales…</div>
+<label class="checkline"><input type="checkbox" id="fuelAuto" checked> Aplicar precio ponderado por estado</label>
+<label class="checkline"><input type="checkbox" id="fuelNationalAuto" checked> Usar precio promedio nacional en tramos sin dato</label>
+<div id="fuelRouteStatus" class="hint" aria-live="polite">Pendiente de ruta.</div>
+<div id="fuelRouteBreakdown" class="fuel-state-breakdown"></div>
+<div id="stateFuelPrices"></div>
+<div class="input-row"><button id="fuelRefresh" type="button" class="secondary">Detectar estados de ruta</button><button id="fuelOnlineRefresh" type="button" class="secondary">Actualizar precios</button></div>
+</div>
+<label for="wage">Sueldo operador (MXN/h)</label><input type="number" id="wage" value="135" min="0">
+<label for="insurance">Seguro (MXN/km)</label><input type="number" id="insurance" value="1.7" min="0" step="0.1">
+<label for="maintenance">Mantenimiento (MXN/km)</label><input type="number" id="maintenance" value="2.6" min="0" step="0.1">
+<label for="tires">Llantas (MXN/km)</label><input type="number" id="tires" value="1.2" min="0" step="0.1">
+<label for="admin">Gastos administrativos (MXN/viaje)</label><input type="number" id="admin" value="450" min="0">
+<div class="fullwidth dynamic-costs gc-carrier-settings"><strong>Factores administrativos por tipo de transportista</strong><p class="hint">Factor aplicado a gastos administrativos. Chico 1.10, mediano 1.00 y grande 0.95 son supuestos iniciales EDITABLES, no referencias Staff ni del mercado.</p><div class="gc-carrier-grid"><label>Chico<input id="factorChico" type="number" value="1.10" min="0" max="5" step="0.01"></label><label>Mediano<input id="factorMediano" type="number" value="1" min="0" max="5" step="0.01"></label><label>Grande<input id="factorGrande" type="number" value="0.95" min="0" max="5" step="0.01"></label></div></div>
+<label for="tolls">Casetas de ida (MXN; regreso estimado = mismo importe)</label><input type="number" id="tolls" value="0" min="0" step="1" title="Total sugerido y/o ingresado manualmente">
+<div class="fullwidth dynamic-costs"><strong>Casetas CAPUFE · referencia GeoRisk V112</strong><p class="hint">Busca una caseta, selecciona tarifa por configuración y agrégala. Verifica que pertenece a la ruta; la BD tarifaria no proporciona geolocalización de todas las casetas.</p>
+<input id="tollSearch" placeholder="Buscar caseta o tramo, ej. San Martín"><select id="tollTariff" aria-label="Caseta y sección"><option value="">Cargando catálogo…</option></select>
+<div class="input-row"><label style="margin:0;flex:1">Clasificación tarifaria <select id="tollClass"><option value="C2">C2</option><option value="C3">C3</option><option value="C4">C4</option><option value="C5">C5</option><option value="C6">C6</option><option value="C7">C7</option><option value="C8">C8</option><option value="C9">C9</option><option value="B2">B2</option><option value="A">Auto (solo consulta)</option></select></label><button type="button" id="tollAdd" class="secondary">Añadir caseta</button></div>
+<div id="tollItems" class="toll-items hint">Sin casetas agregadas.</div><button id="tollClear" class="secondary" type="button">Quitar casetas agregadas</button>
+<p class="hint">Las tarifas de la BD tienen fecha y sección. Su presencia en una ruta y categoría vehicular deben verificarse; no hay detección automática confiable.</p></div>
+
+<div class="fullwidth dynamic-costs imt-config" id="imtSettings">
+  <h4>5 · Desglose técnico IMT y parámetros del vehículo</h4>
+  <p class="hint">Modelo de asignación de costos fijos y variables según la estructura de la Publicación Técnica 630 del IMT. Coeficientes por vehículo, edad y pendiente: <b>hipótesis editables para calibración</b>, no valores oficiales del IMT.</p>
+  <label class="visually-hidden"><input type="checkbox" id="imtEnabled" checked> IMT activo</label>
+  <label>Remuneración del operador <select id="imtOperatorMode"><option value="fijo" selected>Sueldo fijo y prestaciones (costo mensual)</option><option value="variable">Pago por km del viaje (sin sueldo mensual fijo)</option></select></label>
+  <div class="imt-base-grid"><label class="gc-wide">Fabricante / modelo (descriptivo, rendimiento editable)<input type="text" id="imtMakeModel" placeholder="Ej.: Torton motor X / caja seca"></label><label>Año modelo de unidad (2000–2026)<select id="imtModelYear" aria-label="Año modelo de unidad"></select></label><label>Utilidad sobre costo (%)<input type="number" min="0" max="50" step="0.5" id="imtUtility" value="8"></label></div>
+  <details class="imt-config-details"><summary id="imtUnitsLabel">Parámetros por unidad · costos fijos y variables</summary><div id="imtParameters" class="imt-param-grid"></div><button type="button" id="imtReset" class="secondary">Restaurar supuestos de este vehículo</button></details>
+  <p class="hint">El año modifica escenarios de desgaste preliminares; fabricante/modelo es descriptivo y no asigna automáticamente especificaciones no verificadas. Los costos fijos se prorratean por la capacidad mensual de km y horas del ciclo. Diésel de ida cargada y regreso vacío; kilometraje de retorno estimado por el mismo trazado. Pendientes y clases viales desde GeoRisk con ajustes manuales en Esfuerzos.</p>
+</div>
+
+<button type="button" class="secondary" id="autReset">Restablecer referencias AUT</button>
+<p class="hint">Si faltan atributos de superficie de la ruta, el motor AUT utiliza valores base de GeoCoast para kilómetros no identificados y muestra su cobertura.</p>
+<label for="margin">Margen de utilidad (%)</label><input type="number" id="margin" value="15" min="0" max="60">
+<label for="handling">Carga y descarga (horas)</label><input type="number" id="handling" value="2" min="0" step="0.5">
+<label for="workday">Jornada operativa (horas)</label><input type="number" id="workday" value="12" min="4" max="24">
+<label for="terrainFactor">Ajuste manual de diésel por terreno (%)</label><input type="number" id="terrainFactor" value="0" min="0" max="60"><label for="mountainFuel">Diésel adicional por proporción sierra (%)</label><input type="number" id="mountainFuel" value="8" min="0" max="100" step="1">
+<label for="mountainMaintenance">Mantenimiento adicional por sierra (%)</label><input type="number" id="mountainMaintenance" value="12" min="0" max="100" step="1">
+<label for="urbanFuel">Diésel adicional por proporción urbana (%)</label><input type="number" id="urbanFuel" value="15" min="0" max="100" step="1">
+<label for="urbanMaintenance">Mantenimiento adicional por tramo urbano (%)</label><input type="number" id="urbanMaintenance" value="5" min="0" max="100" step="1"></div>
+</div>
+        <div class="settings-actions"><button type="button" id="apply" class="primary">Aplicar y recalcular</button><button type="button" id="cancelCostSettings" class="secondary">Cerrar</button></div>
+        <p class="hint" id="settingsStatus" role="status"></p>
+      </div>
+    </section>
+
+    <div class="visually-hidden" aria-hidden="true">
+      <button id="recalc">Actualizar cotización</button>
+      <button id="swap">↔</button>
+      <input type="date" id="fecha" value="2026-10-17">
+      <select id="fletero"><option>Tercero</option><option>Sindicato</option><option>CemexTransporte</option></select>
+
+            </div>
+
+    <section id="p-capas" class="panel hidden visually-hidden">
+      <h3>Capas</h3>
+      <div class="body">
+        <select id="baseSelect"><option value="calles">Calles</option><option value="satelite">Satélite</option><option value="relieve">Relieve</option></select>
+        <label><input type="checkbox" id="heatCheck"> mapa calor</label>
+        <label><input type="checkbox" id="showSites" checked> sitios</label>
+        <label><input type="checkbox" id="showRoutes" checked> rutas</label>
+      </div>
+    </section>
+    <button id="hideAll" class="visually-hidden"></button>
+  </aside>
+
+  <main class="map-column">
+    <div class="map-topbar">
+      <div class="seg"><button data-base="calles" class="selected">Mapa</button><button data-base="satelite">Satélite</button><button data-base="relieve">Relieve</button></div><button type="button" id="fullscreenMap" class="fullscreen-control" title="Ampliar mapa a pantalla completa" aria-label="Pantalla completa del mapa">⛶ Pantalla completa</button>
+      
+    </div>
+    <div id="map"></div>
+    <section id="servicePanel" class="gc-service-panel" hidden aria-label="Servicios: gasolineras nacionales y diésel por estado">
+      <div class="gc-service-head"><strong>Servicios · gasolineras nacionales y diésel</strong><button id="serviceClose" type="button" aria-label="Cerrar servicios">×</button></div>
+      <p class="hint">Gasolineras con coordenadas: se agrupan por zoom. El precio medio por entidad se usa por separado para cotizar.</p>
+      <div class="gc-service-options"><label><input id="serviceOnlyRoute" type="checkbox"> Limitar promedios estatales a la ruta</label><label><input id="serviceMapPins" type="checkbox"> Mostrar referencias estatales en mapa</label></div>
+      <p id="serviceUpdateStatus" class="hint" aria-live="polite">Precios: pendiente.</p>
+      <div class="gc-service-summary" id="serviceSummary"></div>
+      <div class="gc-stations-area" id="stationSearchArea">
+        <div class="gc-station-head"><strong>Gasolineras de todo México · diésel</strong><small>Clústeres nacionales, independientes de la ruta. Precio y fecha individuales cuando están reportados.</small></div>
+        <div class="gc-service-options"><label><input id="serviceStationsOn" type="checkbox" checked> Mostrar estaciones agrupadas en el mapa</label></div>
+        <div class="gc-station-fields"><label>Combustible<select id="serviceFuelType"><option value="diesel" selected>Diésel</option><option value="regular">Regular</option><option value="premium">Premium</option></select></label><label>Buscar estación<input id="serviceStationFilter" type="search" placeholder="Nombre, marca o permiso"></label></div>
+        <div class="gc-station-controls gc-national-controls"><button id="serviceStationLoad" type="button">Actualizar estaciones nacionales</button><button id="serviceZoomMexico" type="button">Ver México</button></div>
+        <div id="serviceStationStatus" class="hint" aria-live="polite">Activar Servicios para visualizar estaciones en México; al acercar el zoom se separan automáticamente.</div>
+        <div id="serviceStationList" class="gc-station-list"></div>
+        <p class="hint">Sin búsqueda por radio. Los precios se vinculan al padrón de estaciones por su identificador y muestran su fecha reportada. Si no existe precio verificable se indica expresamente.</p>
+      </div>
+      <div class="gc-service-state-title">Promedios de diésel por entidad</div>
+      <div id="serviceClusters" class="gc-service-clusters"></div>
+      <p class="hint"><a href="https://www.gasmapa.com/map" target="_blank" rel="noopener noreferrer">Ver estaciones y precios individuales en GasMapa ↗</a></p>
+    </section>
+    <section id="cemexCatalogPanel" class="gc-cemex-catalog" hidden aria-label="Catálogo CEMEX de bodegas y plantas">
+ <div class="gc-cemex-head"><div><strong>Bodegas y plantas CEMEX</strong><small id="cemexCatalogCount">Preparando catálogo…</small></div><button type="button" id="cemexCatalogClose" aria-label="Cerrar catálogo">×</button></div>
+ <p class="hint">Al activar Bodegas aparecen los puntos del catálogo ya geolocalizados. Las nuevas plantas sin coordenadas verificadas están en la lista y se agregan al mapa después de confirmar su acceso.</p>
+ <input id="cemexCatalogSearch" type="search" placeholder="Buscar planta, municipio o bodega…" aria-label="Buscar ubicaciones CEMEX">
+ <div class="gc-cemex-filters"><select id="cemexCatalogState" aria-label="Estado"><option value="">Todos los estados</option></select><select id="cemexCatalogKind" aria-label="Tipo de instalación"><option value="">Todas las instalaciones</option><option value="Cemento">Cemento</option><option value="Agregados">Agregados</option><option value="Concreto">Concreto</option><option value="Interno">Catálogo existente</option></select></div>
+ <div id="cemexCatalogList" class="gc-cemex-list" aria-live="polite"></div>
+ <div id="cemexCatalogLocate" class="gc-cemex-locate" hidden>
+  <strong id="cemexLocateTitle">Ubicar instalación</strong><label>Dirección para buscar<input id="cemexLocateAddress" aria-label="Dirección a localizar"></label>
+  <button id="cemexLocateSearch" type="button" class="secondary">Buscar dirección en mapa</button>
+  <div id="cemexLocateResults" class="gc-cemex-results"></div>
+  <details><summary>Indicar coordenadas manualmente</summary><div class="gc-cemex-coords"><input id="cemexLat" placeholder="Latitud" inputmode="decimal"><input id="cemexLng" placeholder="Longitud" inputmode="decimal"><button type="button" id="cemexManualPoint">Confirmar punto</button></div><small>Usar solo coordenadas verificadas del acceso a la instalación.</small></details>
+ </div>
+ <p class="hint"><a href="https://www.cemexmexico.com/ubicaciones" target="_blank" rel="noopener noreferrer">Abrir directorio oficial CEMEX ↗</a></p>
+</section>
+    <button class="heat-overlay-toggle" id="heatToggle">IRA GeoRisk <span>OFF</span></button>
+    <div class="map-legend legend">
+      <b>IRA 0–5 · Altitud relativa GeoRisk</b>
+      <div class="legend-row"><span style="background:#3174e7"></span><span>IRA 0</span><span style="background:#26ad69"></span><span>IRA 1</span><span style="background:#f1d83e"></span><span>IRA 2</span><span style="background:#f18730"></span><span>IRA 3</span><span style="background:#e23b43"></span><span>IRA 4–5</span></div>
+      <small id="mapStatus">Selecciona un origen y destino para comenzar</small>
+    </div>
+  </main>
+
+  <aside class="right-column" id="right-side">
+    <section class="panel card-panel" id="p-resumen" hidden>
+      <h3>Resumen de la ruta</h3>
+      <div class="body" id="summary"><p class="hint">Traza una ruta para visualizar distancia, esfuerzo por relieve y estado NOM-012.</p></div>
+    </section>
+
+    <section class="panel card-panel" id="effort-editor-panel" hidden aria-labelledby="effortEditorTitle">
+      <h3 id="effortEditorTitle">Esfuerzos GeoRisk · detección y corrección</h3>
+      <div class="body">
+        <p id="gcEffortMode" class="gc-effort-mode" aria-live="polite"><strong>GeoRisk como referencia principal.</strong> Edita únicamente si hay un error.</p>
+        <p class="hint">GeoCoast estima inicialmente el tipo de camino con evidencia de OpenStreetMap y el perfil altimétrico, usando la metodología de GeoRisk. La corrección es <b>por ruta y alternativa</b>, se guarda en este navegador y se aplica a diésel, desgaste, tiempos y tarifa. No altera automáticamente otras categorías.</p>
+        <div id="effortEditorRows" class="gc-effort-editor-table" aria-label="Comparativo de GeoRisk y kilómetros corregidos"></div>
+        <p id="effortEditorStatus" class="hint" aria-live="polite"></p>
+        <div class="input-row gc-effort-actions">
+          <label>Importar evidencia GeoRisk CSV / JSON<input id="georiskFile" type="file" accept=".csv,.json,application/json,text/csv"></label>
+          <button type="button" class="secondary" id="effortRestore">Restaurar GeoRisk</button>
+          <button type="button" class="secondary" id="effortExport">Exportar corrección JSON</button>
+        </div>
+        <p class="hint">Los ajustes alimentan un archivo de retroalimentación, <b>no entrenan automáticamente GeoRisk</b>. Para conservarlos entre equipos, exporta el JSON e intégralo a una base central validada.</p>
+      </div>
+    </section>
+<section class="panel card-panel" id="p-costos" hidden>
+      <h3>Resultados de cotización</h3>
+      <div class="body">
+        <p class="gc-integral-tag"><strong>Costo integral:</strong> ida + regreso (A → B → A) · casetas de ambos sentidos</p>
+        <div id="costOutput" class="hint">Calcula una ruta para obtener el desglose.</div>
+        
+      </div>
+    </section>
+  </aside>
+
+  <section class="bottom-row panel card-panel" id="p-bodegas" hidden>
+    <h3>Comparativo de orígenes y unidades</h3>
+    <div class="body comparison-wrap">
+      <div id="originQuoteResults" class="hint">Primero traza una ruta para comparar las bodegas próximas al destino.</div>
+    </div>
+  </section>
+  <div class="visually-hidden"><span id="floatTitle"></span><span id="floatSub"></span></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="interface.js"></script>
+<script type="module" src="georisk-efforts-bridge.js"></script>
+<script src="imt-cost-model.js"></script>
+<script src="app.js"></script>
+<script src="zt-sap.js"></script>
+<script src="catalog-layers.js"></script>
+<script src="settings.js"></script>
+<script src="executive-report.js"></script>
+<script src="tolls.js"></script>
+<script src="addresses.js"></script>
+<script src="fullscreen.js"></script>
+
+<script src="effort-editor.js"></script>
+<script src="fuel-core.js"></script>
+<script src="diesel-market.js"></script>
+<script src="services-diesel.js"></script>
+<script src="stations-clusters.js"></script>
+<script src="dynamic-map-layout.js"></script>
+<script src="cemex-oficial.js"></script>
+<script src="gc-settings-clean.js"></script>
+<script src="route-cost-editor.js"></script>
+<script src="audit-report.js"></script>
+<section id="executiveModal" class="exec-modal" hidden><div class="exec-page"><div class="exec-controls"><button id="execClose">Cerrar</button><button id="execPrint">Imprimir / Guardar PDF</button></div><div id="execBody"></div></div></section>
+<div id="gcAuditModal" class="gc-audit-modal" hidden role="dialog" aria-label="Memoria técnica de cálculo"><div class="gc-audit-toolbar"><b>Memoria técnica · Uso interno</b><div><button type="button" id="gcAuditPrint">Imprimir / Guardar PDF</button><button type="button" id="gcAuditClose">Cerrar</button></div></div><article id="gcAuditBody" class="gc-audit-document"></article></div>
+</body>
+</html>

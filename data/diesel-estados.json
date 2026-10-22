@@ -1,0 +1,170 @@
+{
+  "source": "GasMapa (CRE/CNE, promedios por estado)",
+  "sourceUrl": "https://www.gasmapa.com/estados",
+  "observationDate": "2026-10-21",
+  "retrievedDate": "2026-10-21",
+  "nationalPrice": 26.99,
+  "states": [
+    {
+      "state": "Estado de México",
+      "diesel": 26.99,
+      "stations": 1340
+    },
+    {
+      "state": "Jalisco",
+      "diesel": 27.08,
+      "stations": 1062
+    },
+    {
+      "state": "Veracruz",
+      "diesel": 26.99,
+      "stations": 885
+    },
+    {
+      "state": "Nuevo León",
+      "diesel": 26.99,
+      "stations": 819
+    },
+    {
+      "state": "Guanajuato",
+      "diesel": 27.02,
+      "stations": 790
+    },
+    {
+      "state": "Tamaulipas",
+      "diesel": 26.44,
+      "stations": 695
+    },
+    {
+      "state": "Puebla",
+      "diesel": 26.98,
+      "stations": 666
+    },
+    {
+      "state": "Chihuahua",
+      "diesel": 26.78,
+      "stations": 648
+    },
+    {
+      "state": "Baja California",
+      "diesel": 26.16,
+      "stations": 632
+    },
+    {
+      "state": "Michoacán",
+      "diesel": 27.0,
+      "stations": 599
+    },
+    {
+      "state": "Sonora",
+      "diesel": 26.94,
+      "stations": 588
+    },
+    {
+      "state": "Sinaloa",
+      "diesel": 27.08,
+      "stations": 581
+    },
+    {
+      "state": "Coahuila",
+      "diesel": 27.0,
+      "stations": 515
+    },
+    {
+      "state": "Ciudad de México",
+      "diesel": 26.96,
+      "stations": 450
+    },
+    {
+      "state": "Querétaro",
+      "diesel": 26.9,
+      "stations": 399
+    },
+    {
+      "state": "Chiapas",
+      "diesel": 26.72,
+      "stations": 374
+    },
+    {
+      "state": "Yucatán",
+      "diesel": 27.09,
+      "stations": 367
+    },
+    {
+      "state": "Hidalgo",
+      "diesel": 26.97,
+      "stations": 340
+    },
+    {
+      "state": "San Luis Potosí",
+      "diesel": 27.05,
+      "stations": 327
+    },
+    {
+      "state": "Oaxaca",
+      "diesel": 27.45,
+      "stations": 320
+    },
+    {
+      "state": "Quintana Roo",
+      "diesel": 28.14,
+      "stations": 280
+    },
+    {
+      "state": "Guerrero",
+      "diesel": 27.07,
+      "stations": 274
+    },
+    {
+      "state": "Tabasco",
+      "diesel": 27.02,
+      "stations": 266
+    },
+    {
+      "state": "Durango",
+      "diesel": 27.21,
+      "stations": 249
+    },
+    {
+      "state": "Zacatecas",
+      "diesel": 27.07,
+      "stations": 243
+    },
+    {
+      "state": "Aguascalientes",
+      "diesel": 27.02,
+      "stations": 226
+    },
+    {
+      "state": "Morelos",
+      "diesel": 26.93,
+      "stations": 201
+    },
+    {
+      "state": "Baja California Sur",
+      "diesel": 27.6,
+      "stations": 199
+    },
+    {
+      "state": "Nayarit",
+      "diesel": 27.33,
+      "stations": 177
+    },
+    {
+      "state": "Tlaxcala",
+      "diesel": 26.79,
+      "stations": 157
+    },
+    {
+      "state": "Campeche",
+      "diesel": 27.07,
+      "stations": 144
+    },
+    {
+      "state": "Colima",
+      "diesel": 27.03,
+      "stations": 137
+    }
+  ],
+  "note": "Instantánea verificada. Actualizaciones automáticas requieren acceso a la fuente; no son precios garantizados en bomba."
+}
