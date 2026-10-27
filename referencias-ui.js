@@ -31,11 +31,11 @@
   const mi=++turno;
   try{
    const {indice,mapa}=await cargar();if(mi!==turno)return;
-   const idOrigen=mapa[d.site?.name],tipo=R.tipoConexion(d.unit,d.granel),ll=d.dest?.ll;
+   const nomOrigen=d.site?.baseName||d.site?.name||'',idOrigen=mapa[d.site?.baseName]||mapa[d.site?.name]||mapa[nomOrigen.replace(/^CEDIS\s+/i,'')],tipo=R.tipoConexion(d.unit,d.granel),ll=d.dest?.ll;
    if(!layer)layer=L.layerGroup().addTo(window.map);
    limpiar();
    if(!ll)return;
-   if(!idOrigen||!tipo)return mostrarBanner(`<b>Referencias:</b> este origen o tipo de unidad no tiene equivalente en la base de tarifas.`);
+   if(!idOrigen||!tipo)return mostrarBanner(`<b>Referencias:</b> el origen «${esc(nomOrigen)}» o la unidad «${esc(d.unit)}${d.granel?' a granel':''}» no tiene equivalente en la base de tarifas.`);
    const r=R.buscar({indice,idOrigen,tipo,lat:ll[0],lon:ll[1],kms:d.route?.km,casetasModelo:d.q?.variable?.tolls});
    if(!r.pines.length)return mostrarBanner(`<b>Referencias:</b> sin tarifas comparables a ≤15 km del destino (mismo origen, conexión ${esc(tipo)} y kms similares).`);
    L.circle(ll,{radius:r.radio*1000,color:'#0000B3',weight:1.5,fillOpacity:.04,interactive:false}).addTo(layer);
@@ -47,7 +47,7 @@
   }catch(e){console.error('[Referencias]',e);try{mostrarBanner('<b>Referencias no disponibles:</b> '+esc(e.message||e)+'. Revisa que data/referencias.json y data/origen_map.json estén publicados y que abras la app por http, no por archivo.');}catch(_){}}
  }
  document.addEventListener('geocoast:route-start',()=>{turno++;clearTimeout(timer);limpiar();});
- window.addEventListener('geocoast:quote',ev=>{console.info('[Referencias] cotización recibida',{origen:ev.detail?.site?.name,unidad:ev.detail?.unit,destino:ev.detail?.dest?.ll});clearTimeout(timer);timer=setTimeout(()=>actualizar(ev.detail),350);});
+ window.addEventListener('geocoast:quote',ev=>{console.info('[Referencias] cotización recibida',{origen:ev.detail?.site?.baseName||ev.detail?.site?.name,unidad:ev.detail?.unit,destino:ev.detail?.dest?.ll});clearTimeout(timer);timer=setTimeout(()=>actualizar(ev.detail),350);});
  R.diagnostico=async()=>{const o={modulo:true,leaflet:typeof L!=='undefined',mapa:!!window.map,protocolo:location.protocol,cotizacion:!!window.geocostIMTQuote};
   for(const f of ['data/referencias.json','data/origen_map.json']){try{o[f]=(await fetch(f,{method:'HEAD'})).status;}catch(e){o[f]='error: '+e.message;}}
   console.table(o);return o;};

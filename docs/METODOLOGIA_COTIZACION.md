@@ -1,3 +1,5 @@
+**NOTA:** Documento V1 histórico. El motor vigente es `docs/MODELO_FISICO_GCFIS_V2.md`, independiente de esfuerzos logísticos GeoRisk.
+
 # GeoCost SC — Modelo de flete GeoCoast–IMT 2026 (V1 calibrable)
 
 **Fuente metodológica principal:** Instituto Mexicano del Transporte (IMT), Publicación Técnica No. 630 (2021), José Elías Jiménez Sánchez y Ailed Dejanira Rodríguez Cristerna, *Análisis del costo fijo del autotransporte de carga*. PDF proporcionado por el usuario. La investigación sustenta **CF + CV(distance) + U**, el impacto del ciclo de transporte y la productividad de los vehículos sobre el costo fijo unitario, pero **no proporciona los coeficientes que se cargan inicialmente en este modelo para cada unidad**.

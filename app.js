@@ -7,6 +7,16 @@ function base(which){layers[basemap].remove();basemap=which;layers[which].addTo(
 function iraSwitch(v){heat=v;$('heatCheck').checked=v;$('heatToggle').classList.toggle('enabled',v);$('heatToggle').querySelector('span').textContent=v?'ON':'OFF';$('heatToggle').querySelector('span').style.color=v?'#168558':'';$('mapStatus').textContent=v?'Calculando IRA relativo de la ruta…':'IRA desactivado · ruta azul uniforme.';$('mapStatus').title='Bandas relativas de GeoRisk V112; elevación Open-Meteo';$('heatToggle').title='Bandas IRA relativas de GeoRisk V112(9); diferencias posibles en fuente de altitud';$('heatToggle').style.borderColor=v?'#0a70b9':'';drawHeat()};$('heatCheck').onchange=e=>iraSwitch(e.target.checked);$('heatToggle').onclick=()=>iraSwitch(!heat);$('showSites').onchange=e=>e.target.checked?siteLayer.addTo(map):siteLayer.remove();$('showRoutes').onchange=e=>e.target.checked?routingLayer.addTo(map):routingLayer.remove();
 function paintSites(){siteLayer.clearLayers();mapsites=[];bodegas.forEach(s=>{let marker=L.circleMarker(s.ll,{radius:5,weight:1.7,color:'#fff',fillColor:'#006eb7',fillOpacity:.95});marker.bindPopup(`<b>${escapeHtml(s.name)}</b><br>${escapeHtml(s.type)}<br><button onclick="chooseSite(${s.idx})">Usar como origen</button>`);siteLayer.addLayer(marker);mapsites.push(marker)})}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function decorateSiteName(name,type=''){
+ const clean=String(name||'').trim();
+ const typeNorm=String(type||'').toLowerCase();
+ if(!clean)return clean;
+ if(/^(pta\.|cedis|cadis)\s/i.test(clean))return clean;
+ if(/planta/i.test(typeNorm))return clean;
+ if(/concreto/i.test(typeNorm))return `CADIS ${clean}`;
+ if(/bodega|unidad|terminal|centro/i.test(typeNorm))return `CEDIS ${clean}`;
+ return clean;
+}
 // Instala una ubicación nueva SOLO tras confirmar su punto sobre el mapa.
 window.geoRegisterOfficialSite=(metadata,coords)=>{
  const lat=Number(coords?.[0]),lng=Number(coords?.[1]);
@@ -30,7 +40,7 @@ window.geoUseOfficialSite=(site,asDestination=false)=>{
  setStatus(`${site.name}: ubicación seleccionada. Confirma el acceso vial antes de cotizar.`);
 };
 
-async function load(){try{const [fs,bs]=await Promise.all([fetch('data/frentes.json').then(r=>r.json()),fetch('data/bodegas.json').then(r=>r.json())]);frentes=fs.filter(f=>Number.isFinite(+f.lat)&&Number.isFinite(+f.lng)).map((f,i)=>({...f,idx:i,ll:[+f.lat,+f.lng]}));bodegas=bs.filter(b=>Array.isArray(b[1])&&b[1].length===2).map((b,i)=>({name:b[0],ll:b[1],type:b[2],idx:i}));window.bodegas=bodegas;window.frentes=frentes;document.dispatchEvent(new CustomEvent('geocoast:catalog-loaded',{detail:{sites:bodegas.length,clients:frentes.length}}));$('bodegaList').innerHTML=bodegas.slice(0,45).map(s=>`<option value="${escapeHtml(s.name)}">`).join('');$('frenteList').innerHTML='';$('frontCount').textContent=`${frentes.length.toLocaleString('es-MX')} frentes y ${bodegas.length} ubicaciones CEMEX disponibles`;selectedSite=bodegas.find(s=>s.name.toLowerCase().includes('vallejo'))||bodegas[0];$('origen').value=selectedSite.name;paintSites();siteLayer.remove();setStatus('Catálogos cargados · Selecciona un origen y destino')}catch(e){setStatus('Error al cargar catálogos. Ejecuta con un servidor local (no file://).')}}load();
+async function load(){try{const [fs,bs]=await Promise.all([fetch('data/frentes.json').then(r=>r.json()),fetch('data/bodegas.json').then(r=>r.json())]);frentes=fs.filter(f=>Number.isFinite(+f.lat)&&Number.isFinite(+f.lng)).map((f,i)=>({...f,idx:i,ll:[+f.lat,+f.lng]}));bodegas=bs.filter(b=>Array.isArray(b[1])&&b[1].length===2).map((b,i)=>({name:decorateSiteName(b[0],b[2]),baseName:b[0],ll:b[1],type:b[2],idx:i}));window.bodegas=bodegas;window.frentes=frentes;document.dispatchEvent(new CustomEvent('geocoast:catalog-loaded',{detail:{sites:bodegas.length,clients:frentes.length}}));$('bodegaList').innerHTML=bodegas.slice(0,45).map(s=>`<option value="${escapeHtml(s.name)}">`).join('');$('frenteList').innerHTML='';$('frontCount').textContent=`${frentes.length.toLocaleString('es-MX')} frentes y ${bodegas.length} ubicaciones CEMEX disponibles`;selectedSite=bodegas.find(s=>s.name.toLowerCase().includes('vallejo'))||bodegas[0];$('origen').value=selectedSite.name;paintSites();siteLayer.remove();setStatus('Catálogos cargados · Selecciona un origen y destino')}catch(e){setStatus('Error al cargar catálogos. Ejecuta con un servidor local (no file://).')}}load();
 function findSite(){
  const value=$('origen').value.trim().toLowerCase();
  const found=bodegas.find(x=>x.name.toLowerCase()===value)||bodegas.find(x=>value.length>=3&&x.name.toLowerCase().includes(value));
@@ -44,19 +54,21 @@ function findFront(){
  if(front)return front;
  return selectedDest&&selectedDest.ll&&$('destino').value.trim()===(selectedDest.nombre||'')?selectedDest:null;
 }
-window.chooseSite=i=>{selectedSite=bodegas[i];$('origen').value=selectedSite.name;panel('ruta',true);if(selectedDest)goRoute()};map.on('click',e=>{if(window.GCStationClusters?.isPickingCenter?.())return;selectedDest={nombre:'Punto seleccionado',ll:[e.latlng.lat,e.latlng.lng]};$('destino').value=`Punto: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;panel('ruta',true);setStatus('Punto de destino fijado · Pulsa Trazar y cotizar')});$('destino').addEventListener('change',()=>{const f=findFront();if(f)selectedDest=f});$('origen').addEventListener('change',()=>{const s=findSite();if(s)selectedSite=s});$('swap').onclick=()=>{alert('Para invertir la operación, selecciona un nuevo origen del catálogo y un destino válido.')};$('draw').onclick=goRoute;
+window.chooseSite=i=>{selectedSite=bodegas[i];$('origen').value=selectedSite.name;panel('ruta',true);if(selectedDest)goRoute()};map.on('click',e=>{if(window.GCStationClusters?.isPickingCenter?.())return;selectedDest={nombre:'Punto seleccionado',ll:[e.latlng.lat,e.latlng.lng]};$('destino').value=`Punto: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;panel('ruta',true);setStatus('Punto de destino fijado · Pulsa Trazar y cotizar')});$('destino').addEventListener('change',()=>{const f=findFront();if(f)selectedDest=f});$('origen').addEventListener('change',()=>{const s=findSite();if(s)selectedSite=s});$('swap').onclick=()=>{alert('Para invertir la operación, selecciona un nuevo origen del catálogo y un destino válido.');};
 function dist(a,b){const r=Math.PI/180,p1=a[0]*r,p2=b[0]*r,dlat=(b[0]-a[0])*r,dlon=(b[1]-a[1])*r;return 6371*2*Math.asin(Math.sqrt(Math.sin(dlat/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dlon/2)**2))}
 // Selección por radio progresivo desde el frente destino, nunca desde el origen.
 // El radio sólo preselecciona; la prioridad comercial usa km viales comprobados.
 const RADII_KM=[25,50,100,150,250,400,650,1000];
-function eligibleOrigin(s){return !/virtual|nombre interno|unidad estratégica|centro tecnológico/i.test(s.type||'') && !(s.officialId && /agregados|concreto/i.test(s.type||''))}
+function eligibleOrigin(s){return !/virtual|nombre interno|unidad estratégica|centro\s*\/\s*terminal interna/i.test(s.type||'') && !(s.officialId && /agregados|concreto/i.test(s.type||''))}
 function findNearbySites(maxResults=4){
  if(!selectedDest)return {items:[],radius:null,total:0};
- const origin=findSite()||selectedSite;
- const pool=bodegas.filter(s=>eligibleOrigin(s)&&(!origin||s.idx!==origin.idx))
-  .map(site=>({site,linear:dist(site.ll,selectedDest.ll)})).sort((a,b)=>a.linear-b.linear);
- let radius=RADII_KM.find(r=>pool.filter(x=>x.linear<=r).length>=maxResults);
- if(radius===undefined)radius=RADII_KM[RADII_KM.length-1];
+ const origin=findSite()||selectedSite,seen=new Set();
+ const pool=bodegas.filter(site=>eligibleOrigin(site)&&(!origin||site.idx!==origin.idx)&&dist(site.ll,selectedDest.ll)>.1)
+  .map(site=>({site,linear:dist(site.ll,selectedDest.ll)})).sort((a,b)=>a.linear-b.linear)
+  .filter(x=>{const key=x.site.ll.map(v=>v.toFixed(4)).join(',');if(seen.has(key))return false;seen.add(key);return true;});
+ if(!pool.length)return {items:[],radius:null,total:0,available:0};
+ let radius=RADII_KM.find(r=>pool.filter(x=>x.linear<=r).length>=Math.min(maxResults,pool.length));
+ if(radius===undefined){const farthest=pool[Math.min(maxResults,pool.length)-1].linear;radius=Math.ceil(farthest/50)*50||50;}
  const local=pool.filter(x=>x.linear<=radius);
  return {items:local.slice(0,maxResults),radius,total:local.length,available:pool.length};
 }
@@ -78,8 +90,74 @@ function renderSelectableRoutes(activeIndex){
   line.bindTooltip(`Ruta ${r.index+1} · ${N(r.km)} km · clic para recotizar`,{sticky:true});
  });
 }
-async function goRoute(){document.dispatchEvent(new Event('geocoast:route-start'));quoteRequest++;originQuotes=[];selectedSite=findSite();selectedDest=findFront()||selectedDest;if(selectedSite&&selectedDest&&dist(selectedSite.ll,selectedDest.ll)<0.05){setStatus('Selecciona dos instalaciones diferentes para una operación de abasto.');return;}if(!selectedSite||!selectedDest){panel('ruta',true);setStatus(!selectedSite?'Origen no geolocalizado: selecciona una bodega con coordenadas disponibles o verifica el punto exacto antes de cotizar.':'Selecciona un frente o destino geolocalizado.');return}if(!validate()){panel('unidad',true);return}routingLayer.clearLayers();extraLayer.clearLayers();heatLayer.clearLayers();terrainSamples=null;setStatus('Consultando rutas por carretera…');const start=selectedSite.ll,end=selectedDest.ll;map.fitBounds(L.latLngBounds(start,end).pad(.22));L.marker(start).addTo(extraLayer).bindPopup('Origen: '+escapeHtml(selectedSite.name));L.marker(end).addTo(extraLayer).bindPopup('Frente: '+escapeHtml(selectedDest.nombre));nearest();$('originQuoteResults').innerHTML='<p class="hint">Consultando rutas desde bodegas cercanas…</p>';try{let url=`https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&alternatives=true&steps=true`;const response=await fetch(url,{signal:AbortSignal.timeout(18000)});const data=await response.json();if(data.code!=='Ok'||!data.routes?.length)throw Error('Sin ruta vial');lastRouted=data.routes.slice(0,3).map((r,i)=>({km:r.distance/1000,h:r.duration/3600,coords:r.geometry.coordinates.map(c=>[c[1],c[0]]),index:i,raw:r}));for(const r of lastRouted){const geometryKm=(r.coords||[]).slice(1).reduce((sum,p,j)=>sum+dist(r.coords[j],p),0);r.geometryKm=geometryKm;r.distanceQuality=Math.abs(geometryKm-r.km)/Math.max(.001,r.km)>0.12?'La geometría y el kilometraje del motor vial difieren más de 12%. Revisar trazado.':'Consistente';}
-renderSelectableRoutes(0);route=lastRouted[0];map.fitBounds(L.latLngBounds(route.coords).pad(.08));setStatus(`Rutas preliminares (OSRM automóvil): ${N(route.km)} km · ${lastRouted.length} alternativa(s) · NOM-012 pendiente de validar por tramo · velocidad de simulación máx. 80 km/h`);updateCalculations();panel('resumen',true);panel('costos',true);void activateSelectedRoute(route);void compareNearbyOrigins()}catch(e){route=null;lastRouted=[];setStatus('No fue posible obtener trazado por carretera. Reintenta con conexión. No se estimarán kilómetros por línea recta.');$('summary').innerHTML='<p class="error">Servicio de rutas no disponible. No hay distancia vial verificada.</p>';panel('resumen',true)}}
+function gcRoutingProfile(){
+ // Se calcula automáticamente desde la UN seleccionada; sin inputs ni valores fingidos.
+ const type=$('vehiculo')?.value||'Rabón';
+ return window.GCRouteCompliance.profileForUnit(type);
+}
+function gcRouteMode(){return 'public'} // Rutas viales públicas sin token; no confundir con autorización para carga.
+function gcPrevalidate(r){const check=window.GCRouteCompliance?.evaluate?.(gcRoutingProfile(),r?.segments||[])||{status:'PENDING',blocked:[],pending:['Motor de validación no disponible']};if(r?.routedAxles&&r.routedAxles!==gcRoutingProfile().axles){check.pending.push('La ruta fue calculada para otro número de ejes: recalcular');check.status='PENDING';}return check;}
+$('vehiculo')?.addEventListener('change',()=>{if(route)setStatus('El vehículo cambió: vuelve a calcular la ruta y valida limitaciones locales para esta unidad.');});
+// V4: el error de una cotización o de una fuente secundaria jamás borra una ruta vial válida.
+let routingRun=0,routeBusy=false;
+async function goRoute(event){
+ event?.preventDefault?.();
+ // Evita solicitudes dobles y trabajos paralelos iniciados por el mismo clic.
+ if(routeBusy){setStatus('La ruta ya se está consultando; conserva el origen y destino actuales.');return;}
+ const run=++routingRun;document.dispatchEvent(new Event('geocoast:route-start'));
+ quoteRequest++;activeComparison=null;originQuotes=[];
+ selectedSite=findSite();selectedDest=findFront()||selectedDest;
+ if(selectedSite&&selectedDest&&dist(selectedSite.ll,selectedDest.ll)<.05){setStatus('Selecciona un origen distinto del destino.');return;}
+ if(!selectedSite||!selectedDest){panel('ruta',true);setStatus(!selectedSite?'Origen no geolocalizado: elige una bodega válida.':'Selecciona un destino con coordenadas.');return;}
+ if(!validate()){panel('unidad',true);return;}
+ const start=selectedSite.ll,end=selectedDest.ll;
+ routeBusy=true;const button=$('draw');if(button){button.disabled=true;button.textContent='Consultando ruta…';}
+ setStatus('Consultando una ruta por carretera…');
+ let candidates;
+ try{
+  // Motor de geometría abierta: no requiere credenciales. Es un trazado vial
+  // preliminar, NO un ruteo certificado para vehículos pesados / NOM-012.
+  const maxSpeed=gcRoutingProfile().planningSpeedKmh||65;
+  const url=`https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&alternatives=true&steps=true`;
+  const response=await fetch(url,{signal:AbortSignal.timeout(22000)});
+  if(!response.ok)throw Error('Ruteo por carretera: HTTP '+response.status);
+  const data=await response.json();
+  if(data.code!=='Ok'||!Array.isArray(data.routes)||!data.routes.length)throw Error('No se obtuvo trazado por carretera entre origen y destino');
+  candidates=data.routes.slice(0,3).map((r,i)=>({
+    km:r.distance/1000,h:Math.max(r.duration/3600,(r.distance/1000)/Math.max(15,maxSpeed)),
+    coords:r.geometry.coordinates.map(c=>[c[1],c[0]]),index:i,raw:r,
+    routeKind:i?'Alternativa vial':'Ruta vial de referencia',
+    routingSource:'OSRM / OSM · trazo orientativo, restricciones de carga sin validar',
+    routingVerifiedForTruck:false,truckCompliance:'PENDING',
+    policyMaxSpeed:maxSpeed,segments:[],tollStatus:'pending',tollsOneWay:0,
+    routingWarnings:['No se han verificado gálibos, PBV, NOM-012, horario ni restricciones por tramo.']
+  }));
+  if(candidates.some(r=>!(r.km>0)||!Number.isFinite(r.km)||r.coords.length<2))throw Error('Geometría de carretera incompleta');
+  for(const r of candidates){const geometryKm=(r.coords||[]).slice(1).reduce((sum,point,j)=>sum+dist(r.coords[j],point),0);r.geometryKm=geometryKm;r.distanceQuality=Math.abs(geometryKm-r.km)/Math.max(.001,r.km)>.12?'Geometría y distancia de la fuente difieren más de 12%; revisar trazado.':'Consistente';}
+ }catch(error){
+  if(run===routingRun){setStatus('No se obtuvo ruta nueva: '+String(error.message||error)+'. Conservamos la última cotización, si existe.');if(!route){$('summary').innerHTML='<p class="error">Servicio vial no disponible. Intenta otra vez; no se usarán distancias en línea recta.</p>';panel('resumen',true);}}
+  return;
+ }finally{routeBusy=false;if(button){button.disabled=false;button.textContent='Calcular ruta y cotizar';}}
+ if(run!==routingRun)return;
+ // Se reemplaza la ruta únicamente después de haber recibido geometría vial válida.
+ lastRouted=candidates;
+ try{
+  routingLayer.clearLayers();extraLayer.clearLayers();heatLayer.clearLayers();
+  map.fitBounds(L.latLngBounds(start,end).pad(.22));
+  L.marker(start).addTo(extraLayer).bindPopup('Origen: '+escapeHtml(selectedSite.name));
+  L.marker(end).addTo(extraLayer).bindPopup('Destino: '+escapeHtml(selectedDest.nombre||selectedDest.name));
+  renderSelectableRoutes(0);route=lastRouted[0];terrainSamples=null;
+  panel('resumen',true);panel('costos',true);
+  activateSelectedRoute(route);
+ }catch(error){
+  // No eliminar route ni lastRouted; el usuario puede reintentar analizar la ruta recibida.
+  console.error('GeoCoast: error al representar/cotizar ruta',error);
+  route=route||lastRouted[0];panel('resumen',true);panel('costos',true);
+  setStatus('La carretera fue calculada, pero falló el análisis: '+String(error.message||error));
+  $('costOutput').innerHTML='<p class="error">No se pudo completar la cotización. Verifica datos y utiliza Calcular de nuevo. La ruta se conserva.</p>';
+ }
+}
+$('draw').type='button';$('draw').onclick=event=>{void goRoute(event)};
 async function elevations(coords){
  try{
   const axis=axisRoute(coords),max=Math.min(180,Math.max(48,Math.ceil(axis.total/350)+1)),pts=Array.from({length:max},(_,i)=>pointOnAxis(axis,axis.total*i/(max-1)));
@@ -126,55 +204,8 @@ function effortAnalysis(samples,km){
   maintenanceFactor:Math.min(.25,sierraShare*.18+meanGrade*.008),
   timeFactor:Math.min(.25,sierraShare*.14+meanGrade*.009)};
 }
-// GeoRisk V112 category dictionary and sustained-relief concept (GR-EL-2.3-RNC2025).
-// In this standalone cotizador no OSM/RNC road surface geometries are loaded.
-// Hence unverified roads remain pending; never assign all km to a fictional road class.
-const GEO_CLASSES=[['urbano','Urbano'],['autopista_sin','Autopista sin sierra'],['autopista_con','Autopista con sierra'],['pavimento_sin','Pavimento sin sierra'],['pavimento_con','Pavimento con sierra'],['terraceria_sin','Terracería sin sierra'],['terraceria_con','Terracería con sierra']];
-function geoModel(eff,km){
- const result=route?.geoRiskEfforts;
- if(result?.rows?.length){
-  return {rows:result.rows.map(x=>({id:x.id,name:x.label,km:x.meters/1000,share:x.share,estimatedKm:x.estimatedMeters/1000})),unknownKm:result.pendingMeters/1000,mountainKm:km*(eff?.sierraShare||0),version:result.version,verifiedRoadKm:Math.max(0,km-result.estimatedMeters/1000),estimatedKm:result.estimatedMeters/1000};
- }
- return {rows:GEO_CLASSES.map(([id,name])=>({id,name,km:null,share:null})),unknownKm:km,mountainKm:km*(eff?.sierraShare||0),version:'GeoRisk pendiente',verifiedRoadKm:0};
-}
-async function analyzeGeoRiskRoute(){
- if(!route)return;
- try{route.geoRiskEfforts=await window.GeoRiskEfforts?.analyze(route,terrainSamples)||null;}
- catch(error){console.warn('Error al clasificar esfuerzos logísticos:',error);route.geoRiskEfforts=null;}
-}
-function geoMultipliers(eff){
- const relief=eff?.available?eff:{fuelFactor:0,maintenanceFactor:0,timeFactor:0};
- // Editable coefficients below are increments applied to route cost, not fixed shares of total.
- const urbanFuel=input('urbanFuel')/100,urbanMaintenance=input('urbanMaintenance')/100;
- const mountainFuel=input('mountainFuel')/100,mountainMaint=input('mountainMaintenance')/100;
- const mountain=eff?.available?eff.sierraShare:0;
- // No verified urban kilometres -> don't apply urban coefficient without proof.
- const urban=route?.geoRiskEfforts?.rows?.find(r=>r.id==='urbano')?.share/100||0;
- return {fuel:Math.max(0,relief.fuelFactor||0)+mountain*mountainFuel+urban*urbanFuel,
- maintenance:Math.max(0,relief.maintenanceFactor||0)+mountain*mountainMaint+urban*urbanMaintenance,
- time:Math.max(0,relief.timeFactor||0),urban};
-}
-function geoBreakdown(eff,km){
- const editor=window.GCEffortEditor, raw=editor?.rows?.()||[];
- const rows=raw.length?raw:GEO_CLASSES.map(([id,name])=>({id,name,km:0}));
- const sumKm=rows.reduce((s,x)=>s+Math.max(0,Number(x.km)||0),0);
- const missing=Math.max(0,km-sumKm);
- const manual=editor?.modified?.()===true;
- const entries=rows.map(x=>{
-  const v=Math.max(0,Number(x.km)||0),pct=km?100*v/km:0;
-  return `<label class="gc-effort-inputrow"><span>${escapeHtml(x.name)}</span><input aria-label="${escapeHtml(x.name)} kilómetros" data-gc-effort="${escapeHtml(x.id)}" type="number" min="0" step="0.01" value="${v.toFixed(2)}"><b>km</b><strong>${pct.toFixed(1)}%</strong></label><div class="effort-meter"><i style="width:${Math.min(100,pct)}%"></i></div>`;
- }).join('');
- return `<section class="geo-effort gc-editable-effort"><div class="gc-effort-heading"><h4>Esfuerzos logísticos · GeoRisk SC</h4><button type="button" class="secondary" id="gcEffortResetInline">Restaurar automático</button></div><p class="hint">Edita kilómetros de la <b>ida</b>. La aplicación calculará la participación y ajustará diésel, llantas y mantenimiento del <b>ciclo ida + vuelta</b>. Las correcciones son locales de esta ruta. ${manual?'<b>Edición manual activa.</b>':'Se muestran los valores detectados automáticamente.'}</p><div class="gc-effort-grid-head"><span>Clasificación vial</span><span>Km ida</span><span></span><span>% ruta</span></div>${entries}<div class="gc-effort-pending">Sin clasificar: <b>${missing.toFixed(2)} km</b> (${km?(missing/km*100).toFixed(1):'0'}%)</div><div class="gc-effort-pending">Total clasificado: <b>${sumKm.toFixed(2)} / ${km.toFixed(2)} km</b></div>${sumKm>km+.1?'<p class="error">La suma supera la distancia. Reduce kilómetros para poder cotizar.</p>':''}<p class="hint">La clasificación automática depende de datos cartográficos y altimétricos; verifica los tramos antes de establecer tarifas. Los kilómetros no clasificados no reciben un recargo de superficie.</p></section>`;
-}
-document.addEventListener('change',e=>{
- const id=e.target?.dataset?.gcEffort;
- if(!id)return;
- const value=Number(e.target.value);
- if(!Number.isFinite(value)||value<0){alert('Ingresa kilómetros válidos (mayor o igual a cero).');return;}
- window.GCEffortEditor?.setManual?.(id,value);
-});
-document.addEventListener('click',e=>{if(e.target?.id==='gcEffortResetInline')window.GCEffortEditor?.restore?.();});
-function nomPrecheck(unit,tons){return {status:'PENDIENTE DE VALIDACIÓN',reason:`${unit.name}: carga comercial ${N(tons)} Tn; verificar PBV real, configuración de ejes, dimensiones, clasificación oficial ET/A/B/C/D y restricciones por tramo antes de operar. El enrutador OSRM utiliza perfil de automóvil y no acredita compatibilidad NOM-012.`}}
+function nomPrecheck(unit,tons){const check=gcPrevalidate(route),src=route?.routingSource||'Origen de ruta no confirmado',detail=check.blocked.length?check.blocked.join('; '):check.pending.slice(0,4).join('; ');
+ return {status:check.status,reason:`${unit.name}, ${N(tons)} Tn de carga. Fuente: ${src}. ${detail}. Falta verificar restricciones locales, horarios, PBV, dimensiones y permisos por tramo. Esta prevalidación NO equivale a una autorización NOM-012.`};}
 
 // GeoRisk SC V112(9): escala de IRA relativa al mínimo/máximo de la ruta.
 // GeoCoast usa Open-Meteo elevation; la fuente de elevación puede diferir de Terrarium GeoRisk.
@@ -227,88 +258,103 @@ function drawHeat(){
  setStatus('IRA relativo por altitud · referencia GeoRisk V112(9); elevación Open-Meteo.');
 }
 
-const vehSel=$('vehiculo');function vehicles(){let allowed=units.filter(x=>presentation==='Granel'?x.name==='Full':x.name!=='Full');vehSel.innerHTML=allowed.map(u=>`<option value="${u.name}">${u.name} · hasta ${u.cap} Tn</option>`).join('');vehSel.value=allowed.some(u=>u.name==='Rabón')?'Rabón':allowed[0].name;validUnit()}function validUnit(){const u=units.find(x=>x.name===vehSel.value);$('ton').max=u.cap;$('maxInfo').textContent=`Capacidad operativa: hasta ${u.cap} Tn · ${presentation}`;validate()}function validate(){const u=units.find(x=>x.name===vehSel.value),tn=+$('ton').value,valid=u&&tn>0&&tn<=u.cap;$('unitError').textContent=valid?'':`Introduce un volumen entre 0.1 y ${u.cap} Tn para ${u.name}.`;$('recalc').disabled=!valid;return valid}$('sacos').onclick=()=>{presentation='Sacos';$('sacos').classList.add('selected');$('granel').classList.remove('selected');vehicles()};$('granel').onclick=()=>{presentation='Granel';$('granel').classList.add('selected');$('sacos').classList.remove('selected');vehicles()};vehSel.onchange=validUnit;$('ton').oninput=validate;vehicles();$('recalc').onclick=()=>{if(validate()){updateCalculations();if(route)compareNearbyOrigins()}};$('apply').onclick=()=>{updateCalculations();if(route)compareNearbyOrigins()};
-function effortEditImpact(km){
- const editor=window.GCEffortEditor;
- if(!editor?.modified?.())return {fuel:1,wear:1,operator:1,delta:0,valid:true};
- const rows=editor.rows(),original=editor.original?.()||[];
- const total=rows.reduce((n,r)=>n+(Number(r.km)||0),0);
- if(total>km+0.1)return {fuel:1,wear:1,operator:1,delta:0,valid:false};
- const factor={urbano:1.35,autopista_sin:1,autopista_con:1.10,pavimento_sin:1,pavimento_con:1.15,terraceria_sin:1.35,terraceria_con:2};
- const velocity={urbano:21,autopista_sin:57,autopista_con:38,pavimento_sin:50,pavimento_con:34,terraceria_sin:17,terraceria_con:7};
- const weigh=(items,scale)=>items.reduce((sum,r)=>sum+(Number(r.km)||0)*(scale[r.id]||1),0);
- const delta=weigh(rows,factor)-weigh(original,factor);
- const timeDelta=rows.reduce((sum,r)=>sum+(Number(r.km)||0)/(velocity[r.id]||57),0)-original.reduce((sum,r)=>sum+(Number(r.km)||0)/(velocity[r.id]||57),0);
- return {fuel:Math.max(.6,1+.24*delta/Math.max(km,.1)),wear:Math.max(.6,1+.45*delta/Math.max(km,.1)),operator:Math.max(.6,1+.25*timeDelta/Math.max(km/57,.1)),delta,valid:true};
+const vehSel=$('vehiculo');
+function vehicles(){
+  const allowed=units.filter(u=>presentation==='Granel'?['Tráiler','Full'].includes(u.name):u.name!=='Full');
+  const previous=vehSel.value;
+  vehSel.innerHTML=allowed.map(u=>`<option value="${u.name}">${u.name} · ${u.cap} Tn</option>`).join('');
+  vehSel.value=allowed.some(u=>u.name===previous)?previous:(presentation==='Granel'?'Tráiler':'Rabón');
+  vehSel.dispatchEvent(new Event('change'));
 }
+function validUnit(){
+  const u=units.find(x=>x.name===vehSel.value);
+  if(!u){$('unitError').textContent='Selecciona una unidad compatible con '+presentation+'.';$('recalc').disabled=true;return false;}
+  $('ton').value=String(u.cap); // lote óptimo interno; sin captura de demanda/carga
+  $('maxInfo').textContent=`Lote óptimo: ${u.cap} Tn · ${presentation} · ${window.GCRouteCompliance?.AXLE_HINT?.[u.name]||'—'} ejes automáticos`;
+  return validate();
+}
+function validate(){
+  const u=units.find(x=>x.name===vehSel.value),tn=Number($('ton').value);
+  const valid=Boolean(u&&tn===u.cap&&tn>0);
+  $('unitError').textContent=valid?'':'La cotización debe utilizar el lote óptimo de la unidad.';
+  $('recalc').disabled=!valid;
+  return valid;
+}
+$('sacos').onclick=()=>{presentation='Sacos';$('sacos').classList.add('selected');$('granel').classList.remove('selected');vehicles()};
+$('granel').onclick=()=>{presentation='Granel';$('granel').classList.add('selected');$('sacos').classList.remove('selected');vehicles()};
+vehSel.onchange=validUnit;vehicles();
+$('recalc').onclick=()=>{if(validate()){updateCalculations();if(route)paintOriginComparisons()}};
+$('apply').onclick=()=>{if(validate()){updateCalculations();if(route)paintOriginComparisons()}};
 function input(id){return Math.max(0,Number($(id).value)||0)}function gcCarrierFactor(){const t=document.getElementById('tipoTransportista')?.value||'mediano';const id=t==='chico'?'factorChico':t==='grande'?'factorGrande':'factorMediano';const x=Number(document.getElementById(id)?.value);return Number.isFinite(x)&&x>=0?Math.min(x,5):1;}
+function physicalSummaryHtml(physical,km){
+ if(!physical)return `<section class="gc-physical-summary"><h4>Superficie y pendientes · análisis propio de GeoCoast</h4><p class="hint">Clasificación vial automática en curso. Las correcciones físicas se realizan en Configurar costos.</p></section>`;
+ const type={urbano:'Urbano',autopista_sin:'Autopista',autopista_con:'Autopista con pendiente',pavimento_sin:'Pavimento',pavimento_con:'Pavimento con pendiente',terraceria_sin:'Terracería',terraceria_con:'Terracería con pendiente'};
+ const rows=(physical.rows||[]).filter(x=>Number(x.km)>0.01).sort((a,b)=>b.km-a.km);
+ const coverage=km>0?Math.max(0,Math.min(100,100*Number(physical.classifiedKm||0)/km)):0;
+ const top=rows.slice(0,4).map(x=>`<div class="gc-road-line"><span>${escapeHtml(type[x.id]||x.id)}</span><strong>${N(x.km)} km</strong></div>`).join('');
+ return `<section class="gc-physical-summary"><h4>Superficie y pendientes · análisis propio</h4><div class="gc-road-line"><span>Vialidad identificada (${escapeHtml(physical.dataSource||'OSM')})</span><strong>${coverage.toFixed(0)}%</strong></div>${top}<div class="gc-road-line"><span>Coincidencia RNC</span><strong>${N(physical.rncKm||0)} km</strong></div><div class="gc-road-line"><span>Respaldo OSM</span><strong>${N(physical.osmKm||0)} km</strong></div>${physical.unspecifiedUrbanKm>0.1?`<p class="hint">${N(physical.unspecifiedUrbanKm)} km urbanos sin recubrimiento certificado en la RNC.</p>`:''}<div class="gc-road-line"><span>Sin clasificación confirmada</span><strong>${N(physical.unknownKm||0)} km</strong></div><p class="hint">Pendiente y superficie modifican directamente consumo, tiempo y desgaste. Para corregir km utiliza Configurar costos → Tipo de camino y pendiente. El costo deriva de la ruta y los parámetros de la unidad.</p></section>`;
+}
 function updateCalculations(){
  if(!route||!validate())return;
  const u=units.find(x=>x.name===vehSel.value),km=route.km,ton=input('ton');
- const effort=effortAnalysis(terrainSamples,km),nom=nomPrecheck(u,ton),geoRows=window.GCEffortEditor?.rows?.()||[];
+ const effort=effortAnalysis(terrainSamples,km),nom=nomPrecheck(u,ton),physical=window.GCPhysicsEditor?.get?.(route)||route.roadPhysics,geoRows=physical?.rows||[];
  let q;
  try{
-  if(!window.GCIMT)throw Error('No se pudo cargar el motor único IMT–GeoRisk.');
-  q=window.GCIMT.fromApp(route,terrainSamples,geoRows);
+  if(!window.GCIMT)throw Error('No se pudo cargar el modelo GeoCoast–IMT.');
+  q=window.GCIMT.fromApp(route,terrainSamples,geoRows,{roadRows:geoRows,ascent:physical?.ascent,descent:physical?.descent});
   window.geocostIMTQuote=q;window.dispatchEvent(new CustomEvent('geocoast:quote',{detail:{q,route,dest:selectedDest,site:selectedSite,unit:u.name,granel:presentation==='Granel'}}));
-  //window.dispatchEvent(new CustomEvent('geocoast:quote',{detail:{q,route,dest:selectedDest,site:selectedSite,unit:u.name,granel:presentation==='Granel'}}));
   $('costOutput').innerHTML=window.GCIMT.render(q);
-  $('floatTitle').textContent=`${MX(q.tariff)} · ${u.name} · C`;
+  $('floatTitle').textContent=`${MX(q.tariff)} · ${u.name}`;
   $('floatSub').textContent=`${N(q.kmTotal)} km del ciclo · ${MX(q.tariff/ton)}/Tn · utilidad ${N(q.utility*100)}%`;
  }catch(error){
   window.geocostIMTQuote=null;
-  $('costOutput').innerHTML=`<p class="error">No se pudo calcular el modelo IMT–GeoRisk: ${escapeHtml(error.message)}. No se mostrará una tarifa calculada por otro método.</p>`;
+  $('costOutput').innerHTML=`<p class="error">No se pudo calcular el modelo físico GeoCoast–IMT: ${escapeHtml(error.message)}. No se mostrará una tarifa calculada por otro método.</p>`;
   $('floatTitle').textContent='Cotización no disponible';$('floatSub').textContent='Revisa los datos de ruta y unidad.';
  }
  const high=effort.high??null,climb=effort.ascent||0;
- $('summary').innerHTML=`<div class="metricgrid"><div class="metric"><small>Ruta de ida</small><b>${N(km)} km</b></div><div class="metric"><small>Recorrido de ida y regreso</small><b>${N(km*2)} km</b></div><div class="metric"><small>Altitud máxima</small><b>${high===null?'Pendiente':N(high)+' m'}</b></div><div class="metric"><small>Ascenso muestreado</small><b>${high===null?'Sin datos':N(climb)+' m'}</b></div><div class="metric"><small>Esfuerzo logístico</small><b>${effort.available?escapeHtml(effort.effortLevel):'Pendiente'}</b></div><div class="metric"><small>NOM-012</small><b>Pendiente validar</b></div></div><p class="hint"><b>Prevalidación NOM-012:</b> ${escapeHtml(nom.reason)}. No equivale a autorización vial.</p>${geoBreakdown(effort,km)}${geoRiskIRAHtml()}<b>Rutas viales alternativas (sin certificación NOM-012)</b>${lastRouted.map(r=>`<div class="site"><div><strong>Ruta ${r.index+1}${r.index===0?' · principal':''}</strong><small>${N(r.km)} km · ${N(Math.max(r.h,r.km/80))} h</small></div><button onclick="selectRoute(${r.index})">Usar</button></div>`).join('')}`;
+ $('summary').innerHTML=`<div class="metricgrid"><div class="metric"><small>Ruta de ida</small><b>${N(km)} km</b></div><div class="metric"><small>Recorrido de ida y regreso</small><b>${N(km*2)} km</b></div><div class="metric"><small>Altitud máxima</small><b>${high===null?'Pendiente':N(high)+' m'}</b></div><div class="metric"><small>Ascenso muestreado</small><b>${high===null?'Sin datos':N(climb)+' m'}</b></div><div class="metric"><small>Tipo de vía (RNC / OSM)</small><b>${physical?.classifiedKm!=null?N(100*physical.classifiedKm/km)+'% evaluado':'Analizando'}</b></div><div class="metric"><small>NOM-012</small><b>${escapeHtml(nom.status)}</b></div></div><p class="hint"><b>Prevalidación NOM-012:</b> ${escapeHtml(nom.reason)}. No equivale a autorización vial.</p>${physicalSummaryHtml(physical,km)}${geoRiskIRAHtml()}<b>Rutas viales candidatas · ${escapeHtml(route?.routingSource||"sin fuente")} · no autorizadas para despacho</b>${lastRouted.map(r=>`<div class="site"><div><strong>Ruta ${r.index+1}${r.index===0?' · principal':''}</strong><small>${N(r.km)} km · ${N(Math.max(r.h,r.km/80))} h · ${escapeHtml(r.routeKind||'referencial (no validada para carga)')}</small></div><button onclick="selectRoute(${r.index})">Usar</button></div>`).join('')}`;
+ if(activeComparison&&activeComparison.request===quoteRequest)paintOriginComparisons();
 }
 let routeAnalysisToken=0;
-async function activateSelectedRoute(selected,{reuseElevation=false}={}){
+function activateSelectedRoute(selected){
  const token=++routeAnalysisToken;
- route=selected;document.dispatchEvent(new Event('geocoast:route-selected'));renderSelectableRoutes(selected.index);void window.GCFuel?.refreshRoute?.(selected);for(const id of ['p-resumen','p-costos','p-bodegas','effort-editor-panel']){const element=document.getElementById(id);if(element)element.hidden=false;}
-window.GCEffortEditor?.automatic(selected.geoRiskEfforts,selected.km);
- // Mostrar esfuerzos preliminares de inmediato. La consulta OSM actualiza despues.
- if(!selected.geoRiskEfforts&&window.GeoRiskEfforts?.analyze){
-   try{
-     const preliminary=await window.GeoRiskEfforts.analyze(selected,null,{skipOSM:true});
-     if(token!==routeAnalysisToken)return;
-     if(preliminary){selected.geoRiskEfforts=preliminary;window.GCEffortEditor?.automatic(preliminary,selected.km);}
-   }catch(error){console.warn('Esfuerzos preliminares:',error);}
- }
- terrainSamples=selected.terrainCache||null;
- heatLayer.clearLayers();map.fitBounds(L.latLngBounds(selected.coords).pad(.08));
- updateCalculations();
- setStatus(`Ruta ${selected.index+1} seleccionada · ${N(selected.km)} km · consultando evidencia vial y relieve…`);
- // Ejecutar ambas consultas en paralelo. Una fuente caída no bloquea la otra.
- const elevationPromise=terrainSamples?Promise.resolve(terrainSamples):elevations(selected.coords);
- const roadsPromise=window.GeoRiskEfforts?.analyze(selected,null);
- // La altimetría nunca debe esperar a Overpass, ni viceversa.
- const onElevation=Promise.resolve(elevationPromise).then(async samples=>{
+ quoteRequest++;activeComparison=null;originQuotes=[];
+ route=selected;terrainSamples=selected.terrainCache||null;
+ document.dispatchEvent(new Event('geocoast:route-selected'));
+ renderSelectableRoutes(selected.index);
+ for(const id of ['p-resumen','p-costos','p-bodegas']){const element=$(id);if(element)element.hidden=false;}
+ map.fitBounds(L.latLngBounds(selected.coords).pad(.08));heatLayer.clearLayers();
+ try{nearest();showNearbyPreview();updateCalculations();}catch(error){console.warn('Resumen inicial:',error);setStatus('Ruta válida; el resumen requiere recalcularse: '+error.message);}
+ setStatus(`Ruta ${selected.index+1} · ${N(selected.km)} km · ${selected.routingVerifiedForTruck?"validación NOM-012 pendiente":"OSRM referencial, NO apta para despacho"} · analizando costos…`);
+ // Es crucial que la comparación no espere a Overpass: las bodegas se muestran de inmediato.
+ const fuelJob=Promise.resolve().then(()=>window.GCFuel?.refreshRoute?.(selected)).then(()=>{
+  if(token!==routeAnalysisToken)return;
+  selected.dieselPrice=window.GCFuel?.getPrice?.();
+  updateCalculations();
+  void compareNearbyOrigins();
+ }).catch(e=>{
+  if(token!==routeAnalysisToken)return;
+  console.warn('Diésel estatal principal:',e);
+  void compareNearbyOrigins(); // Comparativo con trazados abiertos
+ });
+ const altitudeJob=Promise.resolve(selected.terrainCache||elevations(selected.coords)).then(samples=>{
   if(token!==routeAnalysisToken)return;
   terrainSamples=samples||null;selected.terrainCache=terrainSamples;
   drawHeat();updateCalculations();
-  // Si la evidencia OSM llegó antes, recalcular con el perfil disponible.
-  if(selected.geoRiskEfforts&&selected.geoRiskEfforts.evidenceStatus==='consulta completada'&&terrainSamples?.length>1){
-   const refreshed=await window.GeoRiskEfforts?.analyze(selected,terrainSamples,{reuseEvidence:true});
-   if(token===routeAnalysisToken&&refreshed){selected.geoRiskEfforts=refreshed;window.GCEffortEditor?.automatic(refreshed,selected.km);updateCalculations();}
+  if(terrainSamples){
+   void Promise.resolve().then(()=>window.GCRoadPhysics?.analyze?.(selected,terrainSamples,{force:true})).then(()=>{
+    if(token===routeAnalysisToken)updateCalculations();
+   }).catch(e=>console.warn('Clasificación física con altimetría:',e));
   }
- }).catch(e=>console.warn('Relieve:',e));
- const onRoads=Promise.resolve(roadsPromise).then(async data=>{
+ }).catch(e=>console.warn('Elevación:',e));
+ const physicsJob=Promise.resolve().then(()=>window.GCRoadPhysics?.analyze?.(selected,selected.terrainCache||null)).then(()=>{
+  if(token===routeAnalysisToken)updateCalculations();
+ }).catch(e=>console.warn('Clasificación vial propia GeoCoast:',e));
+ // No await a fuentes OSM: el comparativo tiene ejecución y estado independientes.
+ void Promise.allSettled([fuelJob,altitudeJob,physicsJob]).then(()=>{
   if(token!==routeAnalysisToken)return;
-  if(data){selected.geoRiskEfforts=data;window.GCEffortEditor?.automatic(data,selected.km);updateCalculations();}
-  // Esperar sólo al perfil en curso; la actualización provisional ya se mostró.
-  await onElevation;
-  if(token!==routeAnalysisToken)return;
-  if(data&&terrainSamples?.length>1){
-   const refreshed=await window.GeoRiskEfforts?.analyze(selected,terrainSamples,{reuseEvidence:true});
-   if(token===routeAnalysisToken&&refreshed){selected.geoRiskEfforts=refreshed;window.GCEffortEditor?.automatic(refreshed,selected.km);updateCalculations();}
-  }
- }).catch(e=>console.warn('Vialidad:',e));
- await Promise.allSettled([onElevation,onRoads]);
- if(token!==routeAnalysisToken)return;
- const diagnostic=selected.geoRiskEfforts?.evidenceError;
- setStatus(`Ruta ${selected.index+1} · ${N(selected.km)} km · ${diagnostic?'evidencia OSM parcial: '+diagnostic:'desglose recalculado'}${!terrainSamples?' · elevación no disponible':''}`);
+  setStatus(`Ruta ${selected.index+1} · ${N(selected.km)} km · costos y evidencia disponibles según cobertura de fuentes externas.`);
+ });
 }
 
 window.selectRoute=i=>{const selected=lastRouted.find(x=>x.index===i);if(selected)void activateSelectedRoute(selected);};
@@ -316,52 +362,113 @@ for(const id of ['tipoTransportista','factorChico','factorMediano','factorGrande
 
 if($('showResults'))$('showResults').onclick=()=>{panel('costos',true);panel('resumen',true)};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(n=>n.classList.toggle('active',n===b));const tab=b.dataset.tab;if(tab==='frentes')panel('ruta',true);if(tab==='comparar')if(tab==='reporte'){panel('costos',true);if(route)window.print();else alert('Primero traza una ruta para generar un reporte.')}if(tab==='cot')panel('ruta',true)});
 
-// Cotizaciones de bodegas cercanas: se identifican por distancia geográfica,
-// pero se comparan SOLO con distancias y tiempos de rutas viales efectivamente consultadas.
-function estimateOriginQuote(r,eff){
- try{const q=window.GCIMT.fromApp(r,r.terrainCache||null,(r.geoRiskEfforts?.rows||[]).map(x=>({id:x.id,km:x.meters/1000})),{type:vehSel.value,includeManualCosts:r===route});
-  return {cost:q.cost,tariff:q.tariff,vdu:q.journeyHours?input('workday')/q.journeyHours:0,time:q.journeyHours,eff,items:q.variable,imtQuote:q};
- }catch(err){console.warn('IMT alternativo:',err.message);return {cost:NaN,tariff:NaN,vdu:0,time:0,eff,error:err.message};}
+// Orígenes cercanos: vista inmediata, costos progresivos, y enriquecimiento de OSM/altitud
+// desacoplado del render. Nunca utilizar km geográficos para calcular el flete.
+let activeComparison=null;
+function showNearbyPreview(){
+ const box=$('originQuoteResults');if(!box||!selectedDest)return;
+ const chosen=findNearbySites(4);
+ box.innerHTML=`<div class="comparison-meta"><strong>Orígenes próximos a ${escapeHtml(selectedDest.nombre||'destino')}</strong><span>Radio de identificación: ${chosen.radius} km</span></div>`+
+ (chosen.items.length?`<table class="executive-table"><thead><tr><th>Origen cercano</th><th>Distancia geográfica</th><th>Ruta vial</th><th>Cotización</th></tr></thead><tbody>`+
+ chosen.items.map(x=>`<tr><td>${escapeHtml(x.site.name)}</td><td>${N(x.linear)} km</td><td>Por consultar</td><td>Esperando ruta principal</td></tr>`).join('')+'</tbody></table>':
+ '<p class="hint">No hay bodegas adicionales geolocalizadas en el radio de búsqueda. Verifica las ubicaciones del catálogo.</p>')+
+ '<p class="comparison-footnote">Distancia geográfica sólo para identificar candidatos. GeoCost calcula recorridos viales públicos independientes por origen, sin claves. No son rutas autorizadas para vehículos pesados; restricciones y horarios deben verificarse.</p>';
 }
-async function sampleOriginEffort(coords,km){
+function estimateOriginQuote(r){
+ try{
+  const phys=window.GCPhysicsEditor?.get?.(r)||r.roadPhysics;
+  const fuel=r===route?window.GCFuel?.getPrice?.():r.dieselPrice;
+  if(!Number.isFinite(fuel)||fuel<10)throw Error('Precio diésel estatal pendiente');
+  const q=window.GCIMT.fromApp(r,r.terrainCache||null,phys?.rows||[],{type:vehSel.value,includeManualCosts:r===route,dieselPrice:fuel,ascent:phys?.ascent,descent:phys?.descent,roadRows:phys?.rows||[],elevationAvailable:Boolean(r.terrainCache?.length>1)});
+  return {cost:q.cost,tariff:q.tariff,vdu:q.journeyHours?input('workday')/q.journeyHours:0,time:q.journeyHours,imtQuote:q};
+ }catch(err){return {cost:NaN,tariff:NaN,vdu:0,time:0,error:err?.message||String(err)};}
+}
+function paintOriginComparisons(){
+ if(!activeComparison||!$('originQuoteResults')||!route)return;
+ const {selection,mainOrigin,request}=activeComparison;
+ if(request!==quoteRequest)return;
+ const box=$('originQuoteResults'),chosen=originQuotes,current=estimateOriginQuote(route);
+ const valid=chosen.filter(x=>x.ok&&Number.isFinite(estimateOriginQuote(x.route).tariff));
+ const lowest=valid.length?Math.min(...valid.map(x=>estimateOriginQuote(x.route).tariff)):null;
+ const mainStatus=Number.isFinite(current.tariff)?'Origen seleccionado':(current.error||'Diésel estatal pendiente');
+ const quality=x=>!x.route?'Buscando ruta vial':x.status==='error'?(x.error||'Faltan datos de ruta'):!x.route.terrainCache?'Elevación pendiente':!x.route.roadPhysics?'Clasificación vial pendiente':`${Math.round(100*(x.route.roadPhysics.classifiedKm||0)/x.route.km)}% vía evaluada`;
+ box.innerHTML=`<div class="comparison-meta"><span><strong>${escapeHtml(selectedDest?.nombre||'Destino')}</strong> · ${N(input('ton'))} Tn · ${escapeHtml(vehSel.value)} · ida y regreso</span><span>Radio ${selection.radius} km · ${chosen.length} orígenes cercanos</span></div>`+
+ `<table class="executive-table" aria-label="Cotizaciones de bodegas cercanas"><thead><tr><th>Origen</th><th>Km ida</th><th>Horas ida</th><th>Evidencia</th><th>Tarifa estimada (MXN)</th><th>$/Tn</th><th>Acción</th></tr></thead><tbody>`+
+ `<tr class="origin-current"><td><strong>${escapeHtml(mainOrigin?.name||'Principal')}</strong><span class="origin-tag">Actual</span></td><td>${N(route.km)}</td><td>${N(Math.max(route.h,route.km/80))}</td><td>${route.roadPhysics?Math.round(100*(route.roadPhysics.classifiedKm||0)/route.km)+'% vía evaluada':'Clasificación vial pendiente'}</td><td>${Number.isFinite(current.tariff)?'<strong>'+MX(current.tariff)+'</strong>':'Pendiente'}</td><td>${Number.isFinite(current.tariff)?MX(current.tariff/input('ton')):'—'}</td><td>${Number.isFinite(current.tariff)?'Seleccionado':escapeHtml(mainStatus)}</td></tr>`+
+ chosen.map(x=>{
+  if(!x.route){return `<tr class="${x.status==='error'?'unavailable-route':''}"><td><strong>${escapeHtml(x.site.name)}</strong><small>${N(x.linear)} km geográficos</small></td><td>—</td><td>—</td><td>${escapeHtml(x.error||'Consultando ruta vial…')}</td><td>—</td><td>—</td><td>${x.status==='error'?'Revisar origen':'Consultando…'}</td></tr>`;}
+  const q=estimateOriginQuote(x.route);x.quote=q;x.ok=Number.isFinite(q.tariff);
+  const best=x.ok&&lowest!==null&&Math.abs(q.tariff-lowest)<.001;
+  return `<tr class="${best?'best-route':''}"><td><strong>${escapeHtml(x.site.name)}</strong>${best?'<span class="origin-tag recommended">Menor tarifa estimada</span>':''}</td><td>${N(x.route.km)}</td><td>${N(Math.max(x.route.h,x.route.km/80))}</td><td>${escapeHtml(quality(x))}</td><td>${x.ok?'<strong>'+MX(q.tariff)+'</strong>':'Pendiente'}</td><td>${x.ok?MX(q.tariff/input('ton')):'—'}</td><td>${x.ok?'<button class="route-action" onclick="selectOriginQuote('+x.site.idx+')">Ver ruta</button>':escapeHtml(q.error||'Sin cotización')}</td></tr>`;
+ }).join('')+
+ `</tbody></table><div class="comparison-footnote">Los orígenes se eligen por cercanía geográfica; <b>cada tarifa usa su propio trazado vial, diésel estatal ponderado y altimetría disponible</b>. El resultado puede recalcularse cuando se complete evidencia RNC / OSM. GeoCost consulta automáticamente casetas OSM y cruza tarifas CAPUFE; las plazas sin evidencia quedan pendientes. Las cotizaciones sin evidencia de peajes son preliminares, nunca equivalen a ruta gratuita. Una tarifa sin relieve o clasificación completa es preliminar y requiere validación.</div>`;
+}
+async function sampleOriginTerrain(coords){
  try{const ax=axisRoute(coords),pts=Array.from({length:28},(_,i)=>pointOnAxis(ax,ax.total*i/27));
- const url=`https://api.open-meteo.com/v1/elevation?latitude=${pts.map(p=>p[0].toFixed(5)).join(',')}&longitude=${pts.map(p=>p[1].toFixed(5)).join(',')}`;
- const response=await fetch(url,{signal:AbortSignal.timeout(8500)});if(!response.ok)throw Error('altimetría');
- const j=await response.json();if(!Array.isArray(j.elevation)||j.elevation.length!==pts.length)throw Error('elevaciones incompletas');
- return effortAnalysis(pts.map((p,i)=>({p,e:j.elevation[i]})),km);
- }catch{return effortAnalysis(null,km)}
+  const url=`https://api.open-meteo.com/v1/elevation?latitude=${pts.map(p=>p[0].toFixed(5)).join(',')}&longitude=${pts.map(p=>p[1].toFixed(5)).join(',')}`;
+  const response=await fetch(url,{signal:AbortSignal.timeout(8500)});if(!response.ok)throw Error('Sin altimetría');
+  const j=await response.json();if(!Array.isArray(j.elevation)||j.elevation.length!==pts.length||j.elevation.some(v=>!Number.isFinite(v)))throw Error('Elevaciones incompletas');
+  return pts.map((p,i)=>({p,e:j.elevation[i]}));
+ }catch(error){console.warn('Perfil alternativo no disponible:',error);return null;}
 }
 async function compareNearbyOrigins(){
- if(!selectedDest||!validate()||!route)return;
+ if(!selectedDest||!route)return;
  const request=++quoteRequest;
  const selection=findNearbySites(4);
- const origin=selectedSite,options=selection.items;
- const box=$('originQuoteResults');box.innerHTML='<p class="hint">Buscando hasta cuatro orígenes físicos cercanos al destino (radio progresivo ${selection.radius} km) y consultando sus rutas viales…</p>';
- const results=await Promise.all(options.map(async x=>{
+ const mainOrigin=selectedSite;
+ originQuotes=selection.items.map(x=>({...x,status:'pending',ok:false,route:null,error:null}));
+ activeComparison={request,selection,mainOrigin};
+ paintOriginComparisons();
+ if(!originQuotes.length)return;
+ // La ruta vial abierta (referencial) y el precio de diésel son obligatorios; la altimetría y la clasificación RNC / OSM
+ // enriquecen después sin dejar la interfaz en "Consultando" indefinidamente.
+ // Máximo dos rutas cercanas consultándose al mismo tiempo, evitando saturación de navegador y servidor.
+ async function quoteCandidate(x){
   const a=x.site.ll,b=selectedDest.ll;
   try{
+   let r;
+   // Alternos: geometría vial pública, nunca distancia en línea recta.
    const url=`https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson&alternatives=false`;
-   const response=await fetch(url,{signal:AbortSignal.timeout(14000)});
-   const data=await response.json();if(data.code!=='Ok'||!data.routes?.[0])throw Error('sin ruta vial');
-   const z=data.routes[0],r={km:z.distance/1000,h:z.duration/3600,coords:z.geometry.coordinates.map(c=>[c[1],c[0]])};
-   const effort=await sampleOriginEffort(r.coords,r.km);
-   const quote=estimateOriginQuote(r,effort);return {...x,route:r,quote,ok:Number.isFinite(quote.tariff)};
-  }catch{return {...x,ok:false}}
- }));
- if(request!==quoteRequest)return;
- originQuotes=results;
- const current=estimateOriginQuote(route,effortAnalysis(terrainSamples,route.km));
- if(!Number.isFinite(current.tariff)){box.textContent="Cotización no disponible con el motor único IMT–GeoRisk. Corrige los parámetros del vehículo.";return;}
- const valid=results.filter(x=>x.ok);const lowest=valid.length?Math.min(...valid.map(x=>x.quote.tariff)):null;
- const bad=results.filter(x=>!x.ok);
- box.innerHTML=`<div class="comparison-meta"><span><strong>${escapeHtml(selectedDest.nombre||'Destino seleccionado')}</strong> · ${N(input('ton'))} Tn · Integral ida y vuelta</span><span>Radio de búsqueda: ${selection.radius} km · ${options.length} alternativa(s) evaluadas · ${valid.length} con cotización</span></div>
- <table class="executive-table" aria-label="Comparativo ejecutivo de orígenes y costos">
- <thead><tr><th>Origen</th><th>Ruta (km)</th><th>Tiempo (h)</th><th>Esfuerzo</th><th>Tarifa (MXN)</th><th>$/Tn</th><th>ICO</th><th>Acción</th></tr></thead>
- <tbody><tr class="origin-current"><td><strong>${escapeHtml(origin.name)}</strong><span class="origin-tag">Principal</span></td><td>${N(route.km)}</td><td>${N(Math.max(route.h,route.km/80))}</td><td>${current.eff?.available?escapeHtml(current.eff.effortLevel):'Sin dato'}</td><td><strong>${MX(current.tariff)}</strong></td><td>${MX(current.tariff/input('ton'))}</td><td>${N(current.vdu)}</td><td><span class="selected-route">Actual</span></td></tr>`+
- valid.map((x,i)=>`<tr class="${x.quote.tariff===lowest?'best-route':''}"><td><strong>${escapeHtml(x.site.name)}</strong>${x.quote.tariff===lowest?'<span class="origin-tag recommended">Menor tarifa</span>':''}</td><td>${N(x.route.km)}</td><td>${N(Math.max(x.route.h,x.route.km/80))}</td><td>${x.quote.eff.available?escapeHtml(x.quote.eff.effortLevel):'Sin dato'}</td><td><strong>${MX(x.quote.tariff)}</strong></td><td>${MX(x.quote.tariff/input('ton'))}</td><td>${N(x.quote.vdu)}</td><td><button class="route-action" onclick="selectOriginQuote(${x.site.idx})">Ver ruta</button></td></tr>`).join('')+
- bad.map(x=>`<tr class="unavailable-route"><td><strong>${escapeHtml(x.site.name)}</strong></td><td colspan="6">No se obtuvo ruta vial; sin cotización verificable</td><td>—</td></tr>`).join('')+
- `</tbody></table><div class="comparison-footnote">Tarifas estimadas con parámetros de prueba. ICO = Índice de Capacidad Operativa. El filtro inicial utiliza distancia geográfica; los kilómetros mostrados corresponden a rutas por carretera. Alternativas IMT sin evidencia vial GeoRisk completa: sólo costos base, pendientes por validar. Peajes manuales, inventario y NOM-012 pendientes de validar.</div>`;
- 
+   const response=await fetch(url,{signal:AbortSignal.timeout(16000)});
+   if(!response.ok)throw Error('Motor vial HTTP '+response.status);
+   const data=await response.json();if(data.code!=='Ok'||!data.routes?.[0])throw Error('No se obtuvo trazado por carretera');
+   const z=data.routes[0];const speed=gcRoutingProfile().planningSpeedKmh||65;
+   r={km:z.distance/1000,h:Math.max(z.duration/3600,z.distance/1000/speed),coords:z.geometry.coordinates.map(c=>[c[1],c[0]]),raw:z,routingSource:'OSRM · referencial sin validación de carga',routingVerifiedForTruck:false,truckCompliance:'PENDING',segments:[],tollsOneWay:0,tollStatus:'pending'};
+   if(!Number.isFinite(r.km)||r.km<=0||r.coords.length<2)throw Error('Geometría vial inválida');
+   if(request!==quoteRequest)return;
+   x.route=r;x.status='diesel';paintOriginComparisons();
+   let fuel;
+   for(let attempt=0;attempt<4;attempt++){
+    try{fuel=await window.GCFuel?.getForRoute?.(r);break;}
+    catch(e){if(/aún no cargado|no cargado/i.test(e.message)&&attempt<3)await new Promise(resolve=>setTimeout(resolve,450));else throw e;}
+   }
+   if(!(fuel?.price>=10))throw Error('Sin precio estatal de diésel de este origen');
+   r.dieselPrice=fuel.price;r.dieselInfo=fuel;
+   if(request!==quoteRequest)return;
+   x.status='priced';x.ok=Number.isFinite(estimateOriginQuote(r).tariff);paintOriginComparisons();
+   // Elevación y superficie se procesan después de publicar la tarifa inicial;
+   // jamás mantienen ocupada la cola de origenes cercanos.
+   void (async()=>{
+    try{
+     r.terrainCache=await sampleOriginTerrain(r.coords);
+     if(request!==quoteRequest)return;
+     x.status='terrain';x.ok=Number.isFinite(estimateOriginQuote(r).tariff);paintOriginComparisons();
+     await window.GCRoadPhysics?.analyze?.(r,r.terrainCache||null);
+     if(request!==quoteRequest)return;
+     x.status='done';x.ok=Number.isFinite(estimateOriginQuote(r).tariff);paintOriginComparisons();
+    }catch(error){if(request!==quoteRequest)return;x.status='partial';x.error=String(error.message||error);paintOriginComparisons();}
+   })();
+  }catch(error){
+   if(request!==quoteRequest)return;
+   x.status='error';x.error=error?.message||'Consulta no disponible';x.ok=false;
+   paintOriginComparisons();
+  }
+ }
+ let next=0;
+ const workers=Array.from({length:Math.min(2,originQuotes.length)},async()=>{
+  while(next<originQuotes.length&&request===quoteRequest){const candidate=originQuotes[next++];await quoteCandidate(candidate);}
+ });
+ await Promise.allSettled(workers);
 }
 window.selectOriginQuote=idx=>{
  const candidate=originQuotes.find(x=>x.site.idx===idx&&x.ok);if(!candidate)return;
@@ -369,7 +476,7 @@ window.selectOriginQuote=idx=>{
  routeAnalysisToken++;lastRouted=[{...candidate.route,index:0,raw:{legs:[]}}];
  routingLayer.clearLayers();renderSelectableRoutes(0);
  void activateSelectedRoute(lastRouted[0]);
- // Route already calculated during comparison; no redundant OSRM request.
+ // Reutilizar la geometría vial de referencia, sin otra consulta.
 };
 
 Object.defineProperties(window,{bodegas:{get:()=>bodegas},frentes:{get:()=>frentes},route:{get:()=>route},map:{get:()=>map}});
@@ -404,9 +511,10 @@ window.geocostReportData=()=>({route,selectedSite,selectedDest,originQuotes,unit
 
 
 
-window.addEventListener('effort:changed',()=>{if(route)updateCalculations()});
+
 
 
 // Reactividad del motor IMT cuando se edita vehículo, antigüedad, rendimiento y costos.
 document.addEventListener('DOMContentLoaded',()=>window.GCIMT?.prepare?.());
 document.addEventListener('geocoast:imt-edit',()=>{if(route)updateCalculations();});
+document.addEventListener('geocoast:physics-edit',()=>{if(route)updateCalculations();});

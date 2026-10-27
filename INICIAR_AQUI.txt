@@ -1,0 +1,26 @@
+GeoCost SC V11 — SIN API KEY
+
+Opción 1 (recomendada): Abre la carpeta en Visual Studio Code, Live Server.
+Opción 2: Iniciar_GeoCost_Windows.bat (necesita Python y usa el puerto 8888).
+Opción 3: publicar la carpeta en Netlify; sus funciones de precio y casetas son OPCIONALES.
+
+No se requiere clave SAKBÉ, cuenta ni configuración de token.
+
+Ruteo: la geometría procede de un servicio vial público (OSRM/OSM). NO incorpora
+verificación integral de restricciones a camiones, NOM-012, horarios, gálibo o permisos.
+Por tanto, ninguna ruta queda certificada para despacho; valida con SICT y autoridades.
+
+Diésel: archivo de precios estatales con fecha, ponderado por kilómetros en estados;
+precios de referencia con IVA divididos por 1.16 en el modelo de costo.
+Netlify permite actualización opcional de promedios; en local hay instantánea.
+
+Peajes: OSM/Overpass sin clave detecta plazas aproximadas; el tarifario local
+CAPUFE/FONADIN aporta importe por categoría. Solo se suman coincidencias
+no ambiguas. Los peajes no encontrados NO implican camino libre de cobro.
+El precio bruto se divide por 1.16 para obtener el importe de costeo sin IVA.
+Consulta manual opcional solo para plazas pendientes.
+
+Desglose por viaje: costos variables, fijos, margen, importe MXN y % del costo.
+Los porcentajes dependen de los parámetros y ruta, no están forzados a una plantilla.
+
+V12: se restauraron las referencias tarifarias comerciales (C, C´, B, B+, B SPOT), editables en Configurar costos. No requieren API key.

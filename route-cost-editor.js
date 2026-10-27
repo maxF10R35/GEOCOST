@@ -4,7 +4,7 @@
  */
 (()=>{'use strict';
  const STORE='geocoast-costos-manuales-por-ruta-v1';
- const IDS=['fixed','diesel','maintenance','tires','lubricants','def','tolls','serviceMisc','riskCost'];
+ const IDS=['fixed','diesel','maintenance','suspension','tires','lubricants','def','tolls','serviceMisc','riskCost'];
  const $=id=>document.getElementById(id);
  let currentKey=null,loading=false;
  const coordinate=obj=>Array.isArray(obj?.ll)?obj.ll.map(n=>Number(n).toFixed(4)).join(','):'?';

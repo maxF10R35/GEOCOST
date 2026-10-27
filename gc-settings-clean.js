@@ -35,16 +35,16 @@
   if($('imtSettings'))$('gcIMTPlace').append($('imtSettings'));
   const year=$('imtModelYear');if(year&&!year.children.length){for(let y=2026;y>=2000;y--){const opt=document.createElement('option');opt.value=String(y);opt.textContent=String(y);opt.selected=y===2022;year.append(opt)}}
   const manualFields=$('gcManualCostFields');
-  if(manualFields){const labels={fixed:'Costos fijos asignados al ciclo',diesel:'Diésel',maintenance:'Mantenimiento',tires:'Llantas',lubricants:'Lubricantes',def:'DEF / AdBlue',tolls:'Peajes ambos sentidos',serviceMisc:'Maniobras, viáticos, servicios',riskCost:'Custodia / riesgo justificado'};
+  if(manualFields){const labels={fixed:'Costos fijos asignados al ciclo',diesel:'Diésel',maintenance:'Mantenimiento mecánico',suspension:'Suspensión / amortiguadores',tires:'Llantas',lubricants:'Lubricantes',def:'DEF / AdBlue',tolls:'Peajes ambos sentidos',serviceMisc:'Maniobras, viáticos, servicios',riskCost:'Custodia / riesgo justificado'};
     manualFields.innerHTML=Object.entries(labels).map(([k,s])=>`<label>${s} (MXN / ciclo)<input id="gcManual_${k}" data-gcmanual="${k}" type="number" min="0" step="0.01" placeholder="Auto" autocomplete="off"></label>`).join('');
     manualFields.addEventListener('change',edit);
     $('gcManualReset')?.addEventListener('click',()=>{manualFields.querySelectorAll('input').forEach(x=>x.value='');edit()});
   }
-  setUpTiers();setUpFleet();compactFuel();
-  // IMT–GeoRisk es el único motor. No se generan cotizaciones paralelas.
+  setUpFleet();setUpTiers();compactFuel();
+  // GeoCoast–IMT / GC-FIS es el único motor. No se generan cotizaciones paralelas.
   $('imtEnabled').checked=true;
   for(const id of ['gcMarketMin','gcMarketMax','gcMarketSource','imtModelYear','imtMakeModel'])$(id)?.addEventListener('change',edit);
-  const status=$('settingsStatus');if(status)status.textContent='Modelo único GeoCoast–IMT–GeoRisk. La memoria técnica se genera de forma independiente.';
+  const status=$('settingsStatus');if(status)status.textContent='Modelo único GeoCoast–GeoCoast–IMT / GC-FIS. La memoria técnica se genera de forma independiente.';
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();

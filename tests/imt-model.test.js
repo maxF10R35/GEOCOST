@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {quote,defs}=require('../imt-cost-model');
+const {quote,defs,executiveBreakdown}=require('../imt-cost-model');
 const scenario={km:53.4,travelHours:1,year:2022,dieselPrice:26.99,utility:.08,rows:[{id:'urbano',km:20},{id:'autopista_sin',km:33.4}],elevationAvailable:true,ascent:140,descent:60};
 for(const [type,preset] of Object.entries(defs)){
  const r=quote({...scenario,type,loadTons:preset.cap});
@@ -10,13 +10,13 @@ for(const [type,preset] of Object.entries(defs)){
  assert.equal(Math.round(r.classifiedKm*10)/10,53.4);
 }
 const base={...scenario,type:'Rabón',loadTons:9};
-const normal=quote(base),hill=quote({...base,ascent:1100}),old=quote({...base,year:2003}),moreKm=quote({...base,km:70,rows:[{id:'urbano',km:20},{id:'autopista_sin',km:50}]}),tolls=quote({...base,tollsOneWay:500}),twoMorePoints=quote({...base,utility:.1}),modified=quote({...base,rows:[{id:'urbano',km:20},{id:'autopista_con',km:33.4}]}),fixed=quote({...base,operatorMode:'fijo',operatorPerKm:4}),variable=quote({...base,operatorMode:'variable',operatorPerKm:4});
+const normal=quote(base),hill=quote({...base,ascent:1100}),old=quote({...base,year:2003}),moreKm=quote({...base,km:70,rows:[{id:'urbano',km:20},{id:'autopista_sin',km:50}]}),tolls=quote({...base,tollsOneWay:500}),twoMorePoints=quote({...base,utility:.1}),modified=quote({...base,rows:[{id:'urbano',km:20},{id:'terraceria_con',km:33.4}]}),fixed=quote({...base,operatorMode:'fijo',operatorPerKm:4}),variable=quote({...base,operatorMode:'variable',operatorPerKm:4});
 assert(hill.tariff>normal.tariff,'grade reacts');
 assert(old.tariff>normal.tariff,'model year reacts');
 assert(moreKm.tariff>normal.tariff,'distance reacts');
 assert(tolls.variable.tolls===1000,'tolls doubled');
 assert(twoMorePoints.tariff>normal.tariff,'utility reacts');
-assert(modified.tariff>normal.tariff,'georisk classes react');
+assert(modified.tariff>normal.tariff,'OSM physical surface classes react');
 assert(fixed.monthly.operator>0&&variable.monthly.operator===0,'operator wages not double counted');
 assert(variable.variable.serviceMisc>fixed.variable.serviceMisc,'variable operator compensation correctly used');
 assert.throws(()=>quote({...base,rows:[{id:'urbano',km:54}]}),/superan/);
@@ -30,8 +30,23 @@ assert(normal.refTiers.every((t,i,all)=>i===0||t.amount>=all[i-1].amount),'propo
 assert(Math.abs(normal.refTiers.at(-1).amount-normal.tariff*1.20)<1e-8,'B SPOT is 20% over C');
 const overridden=quote({...base,tierPremiums:{CP:6,B:12,BP:18,SPOT:23}});
 assert(Math.abs(overridden.refTiers.at(-1).amount-overridden.tariff*1.23)<1e-8,'editable bands');
-console.log('PASS: fleet overhead/utilization and C/C Prima/B/B+/B SPOT reference tiers.');
+console.log('PASS: fleet overhead/utilization and C/C´/B/B+/B SPOT reference tiers.');
 const year2008=quote({...base,year:2008}),year2018=quote({...base,year:2018}),year2026=quote({...base,year:2026});
 assert(year2008.tariff>year2018.tariff&&year2018.tariff>year2026.tariff,'2026-2000 modeled continuous age sensitivity');
 assert.equal(quote({...base,cargoType:'sacos'}).cargoType,'sacos');
 console.log('PASS: year 2000–2026 graduated assumptions, sacks scenario.');
+
+
+const executive=executiveBreakdown(normal);
+assert.equal(executive.rows.length,9,'executive breakdown groups 9 components');
+const participationSum=executive.rows.reduce((a,b)=>a+b.participation,0);
+assert(Math.abs(participationSum-1)<1e-9,'executive participation sums to 100% of technical cost');
+assert(Math.abs(executive.totals.variable+executive.totals.fixed-normal.cost)<1e-6,'executive fixed+variable equals technical cost');
+assert(executive.rows.every(r=>!('fluctuation' in r)&&!('impact' in r)),'participation-only rows');
+assert(Math.abs(executiveBreakdown(tolls).rows.find(r=>r.key==='tolls').participation-executive.rows.find(r=>r.key==='tolls').participation)>0.01,'toll participation is not hardcoded');
+const operatorBreakdown=executiveBreakdown(variable);
+assert.equal(operatorBreakdown.rows.find(r=>r.key==='operator').type,'Variable','operator changes classification by payment mode');
+assert(Math.abs(operatorBreakdown.rows.reduce((a,r)=>a+r.amount,0)-variable.cost)<1e-6,'variable operator is not duplicated');
+const changedDiesel=executiveBreakdown(quote({...base,dieselPrice:33.2}));
+assert(changedDiesel.rows.find(r=>r.key==='diesel').participation>executive.rows.find(r=>r.key==='diesel').participation,'diesel percentage reacts to actual price');
+console.log('PASS: dynamic component participation, 100% reconciliation, no fluctuation/impact, and variable operator.');

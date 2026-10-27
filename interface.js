@@ -10,22 +10,20 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(conn && !conn.value) conn.value='Entrega';
   const lote=document.getElementById('ton');
   const viajes=document.getElementById('numeroViajes');
-  const movidas=document.getElementById('movidas');
-  const recalcMovidas=()=>{
-    const lot=Number(lote?.value), count=Number(viajes?.value);
-    movidas.value=(Number.isFinite(lot)&&lot>=0&&Number.isInteger(count)&&count>=1)?String(Math.round(lot*count*100)/100):'';
-  };
-  lote?.addEventListener('input',recalcMovidas);
-  viajes?.addEventListener('input',recalcMovidas);
-  recalcMovidas();
 
   const vehicleSelect=document.getElementById('vehiculo');
   const unitButtons=[...document.querySelectorAll('.unit-btn')];
   function syncUnitButtons(){
     const val=vehicleSelect.value;
-    unitButtons.forEach(b=>b.classList.toggle('active',b.dataset.unit===val));
+    const allowed=new Set([...vehicleSelect.options].map(option=>option.value));
+    unitButtons.forEach(b=>{
+      b.classList.toggle('active',b.dataset.unit===val);
+      b.disabled=!allowed.has(b.dataset.unit);
+      b.title=b.disabled?'No disponible para esta presentación':'Seleccionar '+b.dataset.unit;
+    });
   }
   unitButtons.forEach(btn=>btn.addEventListener('click',()=>{
+    if(btn.disabled)return;
     vehicleSelect.value=btn.dataset.unit;
     vehicleSelect.dispatchEvent(new Event('change'));
     syncUnitButtons();
