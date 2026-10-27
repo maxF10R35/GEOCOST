@@ -4,7 +4,7 @@
   "private": true,
   "description": "Cotizador logístico, rutas y clasificación GeoRisk – Centro Sur",
   "scripts": {
-    "test": "node tests/imt-model.test.js && node tests/manual-route-isolation.test.cjs && node tests/geocoast-integrity.test.cjs"
+    "test": "node tests/imt-model.test.js && node tests/manual-route-isolation.test.cjs && node tests/geocoast-integrity.test.cjs  && node tests/referencias.test.js"
   },
   "engines": {"node": ">=18"}
 }
