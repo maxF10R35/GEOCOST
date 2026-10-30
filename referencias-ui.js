@@ -3,11 +3,15 @@
  'use strict';
  const R=window.GCReferencias,MXN=n=>'$'+Math.round(n).toLocaleString('es-MX');
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- let datos=null,timer=0,turno=0,layer=null,banner=null;
+ let datos=null,timer=0,turno=0,layer=null,banner=null,minimizado=false;
  const css=document.createElement('style');
  css.textContent=`.gcref-pin{background:#fff;color:#0000B3;border:2px solid #0000B3;border-radius:14px;padding:2px 8px;font:700 12px/18px Outfit,Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.3);text-align:center;white-space:nowrap}
  .gcref-pin.cas{border-color:#FFB000}.gcref-pin:hover{background:#0000B3;color:#fff}
- .gcref-banner{position:absolute;z-index:1000;left:50%;top:12px;transform:translateX(-50%);max-width:min(560px,90%);background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.3);padding:8px 12px;font:13px/1.35 Outfit,Arial,sans-serif;color:#3D3D3D}
+ .gcref-banner{position:absolute;z-index:1000;right:12px;top:12px;width:min(320px,48%);background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.3);overflow:hidden;font:13px/1.35 Outfit,Arial,sans-serif;color:#3D3D3D}
+ .gcref-banner.min{width:auto;max-width:min(320px,48%)}
+ .gcref-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 6px 6px 12px;background:#0000B3;color:#fff;font-weight:700;cursor:pointer;user-select:none}
+ .gcref-toggle{background:transparent;border:0;color:#fff;font:700 18px/1 Arial,sans-serif;width:24px;height:24px;cursor:pointer}
+ .gcref-body{padding:8px 12px}.gcref-banner.min .gcref-body{display:none}
  .gcref-banner b{color:#0000B3}.gcref-banner .warn{margin-top:6px;padding:6px 8px;background:#FFF4D6;border-left:4px solid #FFB000;border-radius:4px}`;
  document.head.appendChild(css);
  async function cargar(){
@@ -17,9 +21,12 @@
   return datos;
  }
  function limpiar(){layer?.clearLayers();if(banner)banner.hidden=true;}
- function mostrarBanner(html){
-  if(!banner){banner=document.createElement('div');banner.className='gcref-banner';window.map.getContainer().appendChild(banner);L.DomEvent.disableClickPropagation(banner);}
-  banner.innerHTML=html;banner.hidden=false;
+ function aplicarMin(){banner.classList.toggle('min',minimizado);const t=banner.querySelector('.gcref-toggle');if(t)t.textContent=minimizado?'+':'–';}
+ function mostrarBanner(html,titulo='Referencias'){
+  if(!banner){banner=document.createElement('div');banner.className='gcref-banner';window.map.getContainer().appendChild(banner);L.DomEvent.disableClickPropagation(banner);
+   banner.addEventListener('click',ev=>{if(ev.target.closest('.gcref-head')){minimizado=!minimizado;aplicarMin();}});}
+  banner.innerHTML=`<div class="gcref-head" title="Minimizar o expandir"><span>${titulo}</span><button type="button" class="gcref-toggle" aria-label="Minimizar o expandir"></button></div><div class="gcref-body">${html}</div>`;
+  banner.hidden=false;aplicarMin();
  }
  function popup(p){
   return `<b>${esc(p.Municipio||p.ZT)}, ${esc(p.Estado||'')}</b><br><small>ZT ${esc(p.ZT)} · a ${p.dist.toFixed(1)} km del destino</small><br>
@@ -43,7 +50,7 @@
    let h=`<b>${r.pines.length} referencia(s)</b> a ≤${r.radio} km · mediana ${MXN(r.refMediana)} · modelo C ${MXN(d.q.tariff)}`;
    if(r.ampliado)h+=`<br><small>Radio ampliado a ${r.radio} km (hubo menos de 3 a 5 km).</small>`;
    if(r.avisoCasetas)h+=`<div class="warn">Esta tarifa no incluye casetas; las referencias cercanas incluyen en mediana <b>${MXN(r.casetasRefMediana)}</b>. Referencia sin casetas (base + ajustes): <b>${MXN(r.refSinCasetas)}</b>.</div>`;
-   mostrarBanner(h);
+   mostrarBanner(h,`Referencias · ${r.pines.length}${r.avisoCasetas?' · ⚠ casetas':''}`);
   }catch(e){console.error('[Referencias]',e);try{mostrarBanner('<b>Referencias no disponibles:</b> '+esc(e.message||e)+'. Revisa que data/referencias.json y data/origen_map.json estén publicados y que abras la app por http, no por archivo.');}catch(_){}}
  }
  document.addEventListener('geocoast:route-start',()=>{turno++;clearTimeout(timer);limpiar();});
